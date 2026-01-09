@@ -31,9 +31,9 @@ class Body4DSkeletonExtract:
             },
             "optional": {
                 "person_id": ("INT", {
-                    "default": 1,
-                    "min": 1,
-                    "tooltip": "Person ID for multi-person sequences"
+                    "default": 0,
+                    "min": 0,
+                    "tooltip": "Person ID for multi-person sequences (0-indexed)"
                 }),
                 "joint_subset": (["full_70", "body_17", "body_hands"], {
                     "default": "full_70",
@@ -53,13 +53,13 @@ class Body4DSkeletonExtract:
     FUNCTION = "extract"
     CATEGORY = "SAM-Body4D"
 
-    def extract(self, sequence_data, person_id=1, joint_subset="full_70", smooth_factor=0.0):
+    def extract(self, sequence_data, person_id=0, joint_subset="full_70", smooth_factor=0.0):
         """
         Extract skeleton animation from sequence data.
 
         Args:
             sequence_data: Output from Body4DProcess
-            person_id: Person ID to extract (1-indexed)
+            person_id: Person ID to extract (0-indexed)
             joint_subset: Which joints to include
             smooth_factor: Temporal smoothing amount
 
