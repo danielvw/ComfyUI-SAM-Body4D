@@ -202,13 +202,23 @@ class Body4DProcess:
         # Propagate masks through video
         video_segments = {}
 
-        for frame_idx, obj_ids, low_res_masks, video_res_masks, obj_scores, iou_scores in predictor.propagate_in_video(
+        for result in predictor.propagate_in_video(
             inference_state,
             start_frame_idx=0,
             max_frame_num_to_track=1800,
             reverse=False,
             propagate_preflight=True,
         ):
+            # Handle both 5-value and 6-value return formats
+            # ComfyUI-SAM3: yields 5 values (no iou_scores)
+            # sam-body4d: yields 6 values (with iou_scores)
+            if len(result) == 5:
+                frame_idx, obj_ids, low_res_masks, video_res_masks, obj_scores = result
+            elif len(result) == 6:
+                frame_idx, obj_ids, low_res_masks, video_res_masks, obj_scores, iou_scores = result
+            else:
+                raise ValueError(f"Unexpected return format from propagate_in_video: {len(result)} values")
+
             video_segments[frame_idx] = {
                 out_obj_id: (video_res_masks[i] > 0.0).cpu().numpy()
                 for i, out_obj_id in enumerate(out_obj_ids)
