@@ -348,18 +348,22 @@ class Body4DProcess:
                 continue
 
             # Run SAM-3D-Body inference
-            outputs_batch = estimator.process_frames(
-                batch_frames,
-                bboxes=bboxes_batch,
-                masks=masks_batch,
-                use_mask=True,
-                inference_type=inference_type,
-                id_batch=id_batch,
-                idx_path={},
-                idx_dict={},
-                mhr_shape_scale_dict={},
-                occ_dict={obj_id: [1] * len(batch_frames) for obj_id in out_obj_ids},
-            )
+            # CRITICAL: Disable autocast to prevent BFloat16 tensors
+            # PyTorch CUDA doesn't support "addmm_sparse_cuda" with BFloat16
+            # The MHR TorchScript model has BFloat16 sparse constants that crash on CUDA
+            with torch.cuda.amp.autocast(enabled=False):
+                outputs_batch = estimator.process_frames(
+                    batch_frames,
+                    bboxes=bboxes_batch,
+                    masks=masks_batch,
+                    use_mask=True,
+                    inference_type=inference_type,
+                    id_batch=id_batch,
+                    idx_path={},
+                    idx_dict={},
+                    mhr_shape_scale_dict={},
+                    occ_dict={obj_id: [1] * len(batch_frames) for obj_id in out_obj_ids},
+                )
 
             # Organize outputs by person
             for frame_outputs, ids in zip(outputs_batch, id_batch):
