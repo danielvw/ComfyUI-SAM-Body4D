@@ -255,6 +255,8 @@ class Body4DExportFBX:
             'frames': frames,
             'fps': animation['fps'],
             'joint_count': len(animation['joint_indices']),
+            'joint_indices': animation['joint_indices'],  # Which MHR70 joints to use
+            'joint_subset': animation['joint_subset'],    # Name of subset (full_70, body_17, etc.)
         }
 
         # Save to JSON

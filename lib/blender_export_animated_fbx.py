@@ -89,11 +89,21 @@ def create_armature(skeleton_data):
     first_frame = skeleton_data['frames'][0]
     joint_positions = first_frame['joint_positions']
 
+    # Get joint indices (which MHR70 bones are included)
+    # If not specified, assume all 70 bones
+    joint_indices = skeleton_data.get('joint_indices', list(range(70)))
+    joint_count = skeleton_data.get('joint_count', len(joint_positions))
+
+    print(f"[Blender] Joint subset: {skeleton_data.get('joint_subset', 'full_70')}")
+    print(f"[Blender] Joint count: {joint_count}")
+
     # Create bones with hierarchy
     bones_created = {}
 
-    # First pass: create all bones at origin (we'll animate positions later)
-    for idx, bone_name in enumerate(MHR70_BONE_NAMES):
+    # First pass: create bones for the selected joints
+    for local_idx, mhr70_idx in enumerate(joint_indices):
+        bone_name = MHR70_BONE_NAMES[mhr70_idx]
+
         # Create bone
         bone = armature.data.edit_bones.new(bone_name)
 
@@ -101,7 +111,7 @@ def create_armature(skeleton_data):
         # SAM-3D-Body: X-right, Y-down, Z-forward (camera coords)
         # Blender: X-right, Y-forward, Z-up
         # Transform: (x, y, z) -> (x, -z, -y)
-        src_pos = joint_positions[idx]
+        src_pos = joint_positions[local_idx]
         pos = Vector((src_pos[0], -src_pos[2], -src_pos[1]))
 
         bone.head = pos
@@ -112,13 +122,15 @@ def create_armature(skeleton_data):
 
         bones_created[bone_name] = bone
 
-    # Second pass: set parent relationships
-    for idx, bone_name in enumerate(MHR70_BONE_NAMES):
-        parent_idx = MHR70_BONE_PARENTS[idx]
+    # Second pass: set parent relationships (only if both bones exist)
+    for local_idx, mhr70_idx in enumerate(joint_indices):
+        bone_name = MHR70_BONE_NAMES[mhr70_idx]
+        parent_mhr70_idx = MHR70_BONE_PARENTS[mhr70_idx]
 
-        if parent_idx != -1:
-            parent_name = MHR70_BONE_NAMES[parent_idx]
-            if parent_name in armature.data.edit_bones and bone_name in armature.data.edit_bones:
+        if parent_mhr70_idx != -1:
+            parent_name = MHR70_BONE_NAMES[parent_mhr70_idx]
+            # Only connect if parent is also in our subset
+            if parent_name in bones_created and bone_name in armature.data.edit_bones:
                 armature.data.edit_bones[bone_name].parent = armature.data.edit_bones[parent_name]
 
                 # Connect tail of parent to head of child for cleaner hierarchy
@@ -129,10 +141,10 @@ def create_armature(skeleton_data):
     bpy.ops.object.mode_set(mode='OBJECT')
 
     print(f"[Blender] Created {len(bones_created)} bones")
-    return armature
+    return armature, joint_indices
 
 
-def apply_animation(armature, skeleton_data, fps):
+def apply_animation(armature, skeleton_data, fps, joint_indices):
     """
     Apply animation keyframes to armature.
 
@@ -143,6 +155,7 @@ def apply_animation(armature, skeleton_data, fps):
         armature: Blender armature object
         skeleton_data: Dict with 'frames' key
         fps: Frames per second
+        joint_indices: List of MHR70 indices that are included
     """
     print("[Blender] Applying animation...")
 
@@ -171,14 +184,17 @@ def apply_animation(armature, skeleton_data, fps):
         joint_positions = frame_data['joint_positions']
         joint_rotations = frame_data['joint_rotations']
 
-        for idx, bone_name in enumerate(MHR70_BONE_NAMES):
+        # Iterate over the joints we have (using local index)
+        for local_idx, mhr70_idx in enumerate(joint_indices):
+            bone_name = MHR70_BONE_NAMES[mhr70_idx]
+
             if bone_name not in armature.pose.bones:
                 continue
 
             pose_bone = armature.pose.bones[bone_name]
 
-            # Get world position for this frame
-            src_pos = joint_positions[idx]
+            # Get world position for this frame (using local index)
+            src_pos = joint_positions[local_idx]
 
             # Convert from SAM-3D-Body coordinate system to Blender:
             # SAM-3D-Body: X-right, Y-down, Z-forward (camera coords)
@@ -187,7 +203,7 @@ def apply_animation(armature, skeleton_data, fps):
             blender_pos = Vector((src_pos[0], -src_pos[2], -src_pos[1]))
 
             # Compute delta from rest pose
-            rest_pos = rest_positions_blender[idx]
+            rest_pos = rest_positions_blender[local_idx]
             delta = blender_pos - rest_pos
 
             # Apply delta as location offset (relative to rest pose)
@@ -196,7 +212,7 @@ def apply_animation(armature, skeleton_data, fps):
 
             # Apply rotation (quaternion)
             # Convert quaternion from SAM-3D-Body to Blender coordinate system
-            quat_src = joint_rotations[idx]  # (w, x, y, z)
+            quat_src = joint_rotations[local_idx]  # (w, x, y, z)
             # Transform rotation: same axis swap as position
             quat = Quaternion((quat_src[0], quat_src[1], -quat_src[3], -quat_src[2]))
             pose_bone.rotation_mode = 'QUATERNION'
@@ -292,8 +308,8 @@ def main():
     clear_scene()
 
     # Create armature and apply animation
-    armature = create_armature(skeleton_data)
-    apply_animation(armature, skeleton_data, fps)
+    armature, joint_indices = create_armature(skeleton_data)
+    apply_animation(armature, skeleton_data, fps, joint_indices)
 
     # Import mesh if provided
     if mesh_obj != "none":
