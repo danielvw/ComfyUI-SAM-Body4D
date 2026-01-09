@@ -244,8 +244,15 @@ class Body4DExportFBX:
             positions = animation['joint_positions'][frame_idx]  # [n_joints, 3]
             rotations = animation['joint_rotations'][frame_idx]  # [n_joints, 4]
 
+            # Flip all axes for Blender export (matches ComfyUI-SAM3DBody)
+            # This is needed because Blender uses a different coordinate system
+            positions_flipped = positions.copy()
+            positions_flipped[:, 0] = -positions[:, 0]  # Flip X
+            positions_flipped[:, 1] = -positions[:, 1]  # Flip Y
+            positions_flipped[:, 2] = -positions[:, 2]  # Flip Z
+
             frame_data = {
-                'joint_positions': positions.tolist(),
+                'joint_positions': positions_flipped.tolist(),
                 'joint_rotations': rotations.tolist(),
             }
             frames.append(frame_data)

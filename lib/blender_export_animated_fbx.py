@@ -108,11 +108,11 @@ def create_armature(skeleton_data):
         bone = armature.data.edit_bones.new(bone_name)
 
         # Get position from first frame and convert coordinate system
-        # SAM-3D-Body: X-right, Y-down, Z-forward (camera coords)
-        # Blender: X-right, Y-forward, Z-up
-        # Transform: (x, y, z) -> (x, -z, -y)
+        # After flip in Python: (-X, -Y, -Z)
+        # Blender transform: X stays, Y <- -Z, Z <- Y
+        # This matches ComfyUI-SAM3DBody reference implementation
         src_pos = joint_positions[local_idx]
-        pos = Vector((src_pos[0], -src_pos[2], -src_pos[1]))
+        pos = Vector((src_pos[0], -src_pos[2], src_pos[1]))
 
         bone.head = pos
 
@@ -169,9 +169,11 @@ def apply_animation(armature, skeleton_data, fps, joint_indices):
     rest_positions = first_frame['joint_positions']
 
     # Convert rest positions to Blender coordinate system
+    # After flip in Python: (-X, -Y, -Z)
+    # Blender transform: X stays, Y <- -Z, Z <- Y
     rest_positions_blender = []
     for pos in rest_positions:
-        rest_positions_blender.append(Vector((pos[0], -pos[2], -pos[1])))
+        rest_positions_blender.append(Vector((pos[0], -pos[2], pos[1])))
 
     # Set armature as active
     bpy.context.view_layer.objects.active = armature
@@ -196,11 +198,10 @@ def apply_animation(armature, skeleton_data, fps, joint_indices):
             # Get world position for this frame (using local index)
             src_pos = joint_positions[local_idx]
 
-            # Convert from SAM-3D-Body coordinate system to Blender:
-            # SAM-3D-Body: X-right, Y-down, Z-forward (camera coords)
-            # Blender: X-right, Y-forward, Z-up
-            # Transform: (x, y, z) -> (x, -z, -y)
-            blender_pos = Vector((src_pos[0], -src_pos[2], -src_pos[1]))
+            # Convert from flipped coords to Blender
+            # After flip in Python: (-X, -Y, -Z)
+            # Blender transform: X stays, Y <- -Z, Z <- Y
+            blender_pos = Vector((src_pos[0], -src_pos[2], src_pos[1]))
 
             # Compute delta from rest pose
             rest_pos = rest_positions_blender[local_idx]
@@ -211,10 +212,11 @@ def apply_animation(armature, skeleton_data, fps, joint_indices):
             pose_bone.keyframe_insert(data_path="location", frame=frame_idx)
 
             # Apply rotation (quaternion)
-            # Convert quaternion from SAM-3D-Body to Blender coordinate system
+            # Convert quaternion to match coordinate swap
+            # Coordinate transform: X stays, Y <- -Z, Z <- Y
+            # Quaternion: swap Y/Z components to match
             quat_src = joint_rotations[local_idx]  # (w, x, y, z)
-            # Transform rotation: same axis swap as position
-            quat = Quaternion((quat_src[0], quat_src[1], -quat_src[3], -quat_src[2]))
+            quat = Quaternion((quat_src[0], quat_src[1], quat_src[3], quat_src[2]))
             pose_bone.rotation_mode = 'QUATERNION'
             pose_bone.rotation_quaternion = quat
             pose_bone.keyframe_insert(data_path="rotation_quaternion", frame=frame_idx)
