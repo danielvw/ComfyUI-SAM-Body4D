@@ -173,7 +173,7 @@ class Body4DProcess:
         labels = np.array(grid_labels, dtype=np.int32)
 
         # Use SAM-3's add_new_points_or_box to detect objects
-        # Returns: (frame_idx, out_obj_ids, out_mask_logits)
+        # Returns: (frame_idx, obj_ids, low_res_masks, video_res_masks)
         result = predictor.add_new_points_or_box(
             inference_state=inference_state,
             frame_idx=0,
@@ -183,10 +183,14 @@ class Body4DProcess:
         )
 
         # Handle different return formats
+        # SAM-3 returns: (frame_idx, obj_ids, low_res_masks, video_res_masks)
         if len(result) == 2:
             out_obj_ids, out_mask_logits = result
         elif len(result) == 3:
             _, out_obj_ids, out_mask_logits = result
+        elif len(result) == 4:
+            # Format: (frame_idx, obj_ids, low_res_masks, video_res_masks)
+            _, out_obj_ids, _, out_mask_logits = result
         else:
             raise ValueError(f"Unexpected return format from add_new_points_or_box: {len(result)} values")
 
