@@ -343,24 +343,27 @@ class Body4DProcess:
                 for obj_id in out_obj_ids:
                     # Extract object mask
                     # NOTE: Masks stored with obj_id + 1 to distinguish from background
-                    obj_mask = (mask == (obj_id + 1)).astype(np.uint8) * 255
+                    # SAM-3D-Body expects binary masks (0 or 1), not 0-255
+                    obj_mask = (mask == (obj_id + 1)).astype(np.uint8)
 
                     if obj_mask.sum() == 0:
                         print(f"[Body4D] WARNING: Frame {i + frame_idx}: No mask found for person {obj_id} (looking for value {obj_id + 1})")
                         print(f"[Body4D]   Mask unique values: {np.unique(mask)}")
                         continue
 
-                    # Compute bbox from mask
-                    coords = cv2.findNonZero(obj_mask)
+                    # Compute bbox from mask (need 0-255 for cv2)
+                    coords = cv2.findNonZero(obj_mask * 255)
                     if coords is not None:
                         x, y, w, h = cv2.boundingRect(coords)
                         bbox = np.array([[x, y, x + w, y + h]], dtype=np.float32)
                         bbox_list.append(bbox)
-                        mask_list.append(obj_mask)
+                        # Add channel dimension: (H, W) -> (H, W, 1)
+                        mask_list.append(obj_mask[:, :, np.newaxis])
                         id_list.append(obj_id)
 
                 if len(bbox_list) > 0:
                     bboxes_batch.append(np.concatenate(bbox_list, axis=0))
+                    # Stack masks: list of (H, W, 1) -> (N, H, W, 1)
                     masks_batch.append(np.stack(mask_list, axis=0))
                     id_batch.append(id_list)
 
@@ -370,6 +373,7 @@ class Body4DProcess:
 
             print(f"[Body4D] DEBUG: bboxes_batch has {len(bboxes_batch)} frames, id_batch={id_batch}")
             print(f"[Body4D] DEBUG: First bbox shape: {bboxes_batch[0].shape if bboxes_batch else 'NONE'}")
+            print(f"[Body4D] DEBUG: First mask shape: {masks_batch[0].shape if masks_batch else 'NONE'}")
 
             # Run SAM-3D-Body inference
             # CRITICAL: Disable autocast to prevent BFloat16 tensors
@@ -395,8 +399,10 @@ class Body4DProcess:
                 print(f"[Body4D] DEBUG: First output type={type(outputs_batch[0])}")
 
             # Organize outputs by person
-            for frame_outputs, ids in zip(outputs_batch, id_batch):
-                print(f"[Body4D] DEBUG: frame_outputs type={type(frame_outputs)}, ids={ids}")
+            for idx, (frame_outputs, ids) in enumerate(zip(outputs_batch, id_batch)):
+                print(f"[Body4D] DEBUG: frame_outputs type={type(frame_outputs)}, len={len(frame_outputs) if hasattr(frame_outputs, '__len__') else 'N/A'}, ids={ids}")
+                if len(frame_outputs) == 0:
+                    print(f"[Body4D] WARNING: Frame {idx} returned EMPTY outputs from estimator!")
                 for person_output, person_id in zip(frame_outputs, ids):
                     person_outputs[person_id].append(person_output)
                     print(f"[Body4D] DEBUG: Added output for person {person_id}")
