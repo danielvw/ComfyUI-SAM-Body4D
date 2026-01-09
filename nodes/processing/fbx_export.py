@@ -129,6 +129,14 @@ class Body4DExportFBX:
             blender_exec = self._resolve_blender_path(blender_path)
             print(f"[Body4D] Using Blender: {blender_exec}")
 
+            # Check if we have execute permission
+            if not os.access(blender_exec, os.X_OK):
+                raise PermissionError(
+                    f"No execute permission for Blender: {blender_exec}\n"
+                    f"Try: sudo chmod +x {blender_exec}\n"
+                    f"Or copy Blender to a user-accessible location (e.g., ~/blender/)"
+                )
+
             # Call Blender subprocess
             print(f"[Body4D] Calling Blender subprocess...")
             try:
