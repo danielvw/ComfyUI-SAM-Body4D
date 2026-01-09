@@ -330,6 +330,8 @@ class Body4DProcess:
                     obj_mask = (mask == (obj_id + 1)).astype(np.uint8) * 255
 
                     if obj_mask.sum() == 0:
+                        print(f"[Body4D] WARNING: Frame {i + frame_idx}: No mask found for person {obj_id} (looking for value {obj_id + 1})")
+                        print(f"[Body4D]   Mask unique values: {np.unique(mask)}")
                         continue
 
                     # Compute bbox from mask
@@ -347,6 +349,7 @@ class Body4DProcess:
                     id_batch.append(id_list)
 
             if len(bboxes_batch) == 0:
+                print(f"[Body4D] WARNING: Batch starting at frame {i} has no valid masks, skipping")
                 continue
 
             # Run SAM-3D-Body inference
@@ -371,6 +374,10 @@ class Body4DProcess:
             for frame_outputs, ids in zip(outputs_batch, id_batch):
                 for person_output, person_id in zip(frame_outputs, ids):
                     person_outputs[person_id].append(person_output)
+
+        # Debug: Check if we got any outputs
+        for obj_id in out_obj_ids:
+            print(f"[Body4D] Person {obj_id}: {len(person_outputs[obj_id])} frames processed")
 
         return person_outputs
 
