@@ -14,12 +14,12 @@ SAM_BODY4D_PATH = Path(__file__).parent.parent.parent.parent / "sam-body4d"
 if SAM_BODY4D_PATH.exists():
     # Remove any existing ComfyUI paths that might conflict
     # Insert sam-body4d paths at the very beginning to avoid conflicts with ComfyUI's utils
-    # Note: sam_3d_body uses absolute imports like "from sam_3d_body.data.transforms import ..."
-    # so we need to add models/sam_3d_body to sys.path (not the inner sam_3d_body folder)
+    # IMPORTANT: sam_3d_body package structure is models/sam_3d_body/sam_3d_body/
+    # We need to add the INNER sam_3d_body directory to sys.path
     paths_to_add = [
         str(SAM_BODY4D_PATH),
         str(SAM_BODY4D_PATH / "models"),
-        str(SAM_BODY4D_PATH / "models" / "sam_3d_body"),
+        str(SAM_BODY4D_PATH / "models" / "sam_3d_body" / "sam_3d_body"),  # INNER package
         str(SAM_BODY4D_PATH / "models" / "diffusion_vas"),
     ]
     for path in reversed(paths_to_add):

@@ -12,10 +12,12 @@ from pathlib import Path
 # This ensures all imports can find sam-body4d modules correctly
 SAM_BODY4D_PATH = Path(__file__).parent.parent / "sam-body4d"
 if SAM_BODY4D_PATH.exists():
+    # IMPORTANT: sam_3d_body package structure is models/sam_3d_body/sam_3d_body/
+    # We need to add the INNER sam_3d_body directory to sys.path
     paths_to_add = [
         str(SAM_BODY4D_PATH),
         str(SAM_BODY4D_PATH / "models"),
-        str(SAM_BODY4D_PATH / "models" / "sam_3d_body"),
+        str(SAM_BODY4D_PATH / "models" / "sam_3d_body" / "sam_3d_body"),  # INNER package
         str(SAM_BODY4D_PATH / "models" / "diffusion_vas"),
     ]
     for path in reversed(paths_to_add):
