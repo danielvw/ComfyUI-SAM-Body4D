@@ -92,27 +92,39 @@ def create_armature(skeleton_data):
     # Create bones with hierarchy
     bones_created = {}
 
+    # First pass: create all bones at origin (we'll animate positions later)
     for idx, bone_name in enumerate(MHR70_BONE_NAMES):
-        parent_idx = MHR70_BONE_PARENTS[idx]
-
         # Create bone
         bone = armature.data.edit_bones.new(bone_name)
 
-        # Set position from first frame
-        pos = Vector(joint_positions[idx])
+        # Get position from first frame and convert coordinate system
+        # SAM-3D-Body: X-right, Y-down, Z-forward (camera coords)
+        # Blender: X-right, Y-forward, Z-up
+        # Transform: (x, y, z) -> (x, -z, -y)
+        src_pos = joint_positions[idx]
+        pos = Vector((src_pos[0], -src_pos[2], -src_pos[1]))
+
         bone.head = pos
 
-        # Set tail (slightly offset from head)
-        # Use direction to child or arbitrary offset
-        bone.tail = pos + Vector((0, 0.05, 0))  # Small upward offset
-
-        # Set parent
-        if parent_idx != -1:
-            parent_name = MHR70_BONE_NAMES[parent_idx]
-            if parent_name in armature.data.edit_bones:
-                bone.parent = armature.data.edit_bones[parent_name]
+        # Set tail (slightly offset from head in bone's direction)
+        # For better visualization, offset along Z (up in Blender)
+        bone.tail = pos + Vector((0, 0, 0.03))
 
         bones_created[bone_name] = bone
+
+    # Second pass: set parent relationships
+    for idx, bone_name in enumerate(MHR70_BONE_NAMES):
+        parent_idx = MHR70_BONE_PARENTS[idx]
+
+        if parent_idx != -1:
+            parent_name = MHR70_BONE_NAMES[parent_idx]
+            if parent_name in armature.data.edit_bones and bone_name in armature.data.edit_bones:
+                armature.data.edit_bones[bone_name].parent = armature.data.edit_bones[parent_name]
+
+                # Connect tail of parent to head of child for cleaner hierarchy
+                parent_bone = armature.data.edit_bones[parent_name]
+                child_bone = armature.data.edit_bones[bone_name]
+                parent_bone.tail = child_bone.head
 
     bpy.ops.object.mode_set(mode='OBJECT')
 
@@ -123,6 +135,9 @@ def create_armature(skeleton_data):
 def apply_animation(armature, skeleton_data, fps):
     """
     Apply animation keyframes to armature.
+
+    The joint positions from SAM-3D-Body are in world space.
+    We compute the delta from rest pose to animate the bones.
 
     Args:
         armature: Blender armature object
@@ -135,6 +150,15 @@ def apply_animation(armature, skeleton_data, fps):
     bpy.context.scene.frame_start = 0
     bpy.context.scene.frame_end = len(skeleton_data['frames']) - 1
     bpy.context.scene.render.fps = int(fps)
+
+    # Get rest pose positions (from first frame - used to create armature)
+    first_frame = skeleton_data['frames'][0]
+    rest_positions = first_frame['joint_positions']
+
+    # Convert rest positions to Blender coordinate system
+    rest_positions_blender = []
+    for pos in rest_positions:
+        rest_positions_blender.append(Vector((pos[0], -pos[2], -pos[1])))
 
     # Set armature as active
     bpy.context.view_layer.objects.active = armature
@@ -153,13 +177,28 @@ def apply_animation(armature, skeleton_data, fps):
 
             pose_bone = armature.pose.bones[bone_name]
 
-            # Apply position
-            pos = Vector(joint_positions[idx])
-            pose_bone.location = pos
+            # Get world position for this frame
+            src_pos = joint_positions[idx]
+
+            # Convert from SAM-3D-Body coordinate system to Blender:
+            # SAM-3D-Body: X-right, Y-down, Z-forward (camera coords)
+            # Blender: X-right, Y-forward, Z-up
+            # Transform: (x, y, z) -> (x, -z, -y)
+            blender_pos = Vector((src_pos[0], -src_pos[2], -src_pos[1]))
+
+            # Compute delta from rest pose
+            rest_pos = rest_positions_blender[idx]
+            delta = blender_pos - rest_pos
+
+            # Apply delta as location offset (relative to rest pose)
+            pose_bone.location = delta
             pose_bone.keyframe_insert(data_path="location", frame=frame_idx)
 
             # Apply rotation (quaternion)
-            quat = Quaternion(joint_rotations[idx])  # (w, x, y, z)
+            # Convert quaternion from SAM-3D-Body to Blender coordinate system
+            quat_src = joint_rotations[idx]  # (w, x, y, z)
+            # Transform rotation: same axis swap as position
+            quat = Quaternion((quat_src[0], quat_src[1], -quat_src[3], -quat_src[2]))
             pose_bone.rotation_mode = 'QUATERNION'
             pose_bone.rotation_quaternion = quat
             pose_bone.keyframe_insert(data_path="rotation_quaternion", frame=frame_idx)
