@@ -58,7 +58,7 @@ class LoadBody4DModel:
     @classmethod
     def INPUT_TYPES(cls):
         # Default to the configs/ directory in the ComfyUI-SAM-Body4D repository
-        default_config = str(Path(__file__).parent.parent.parent / "configs" / "body4d.yaml")
+        default_config = str(Path(__file__).parent.parent / "configs" / "body4d.yaml")
         return {
             "required": {
                 "config_path": ("STRING", {
