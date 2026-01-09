@@ -1,0 +1,34 @@
+# SAM-Body4D Configuration
+# Copy this file and adjust paths to your model checkpoints
+
+sam3:
+  # Path to SAM-3 checkpoint (sam3.pt)
+  # Download from: https://huggingface.co/facebook/sam3
+  ckpt_path: "path/to/your/checkpoints/sam3/sam3.pt"
+
+sam_3d_body:
+  # Path to SAM-3D-Body checkpoint
+  # Download from: https://huggingface.co/facebook/sam-3d-body-dinov3
+  ckpt_path: "path/to/your/checkpoints/sam_3d_body/sam_3d_body.pth"
+
+  # Path to MHR (Momentum Human Rig) template
+  mhr_path: "path/to/your/checkpoints/sam_3d_body/mhr_template.pkl"
+
+  # Path to FOV estimator (MOGE2)
+  fov_path: "path/to/your/checkpoints/moge2/moge2.pth"
+
+  # Batch size for inference
+  batch_size: 64
+
+completion:
+  # Enable occlusion handling (requires 40GB+ VRAM)
+  enable: false
+
+  # Diffusion-VAS model paths (only needed if enable: true)
+  model_path_mask: "path/to/your/checkpoints/diffusion_vas/mask_model.pth"
+  model_path_rgb: "path/to/your/checkpoints/diffusion_vas/rgb_model.pth"
+  model_path_depth: "path/to/your/checkpoints/diffusion_vas/depth_model.pth"
+  depth_encoder: "vit_large"
+
+  # Maximum occlusion length to handle
+  max_occ_len: 10
