@@ -222,6 +222,9 @@ class Body4DProcess:
         # Limit to max_persons
         out_obj_ids = out_obj_ids[:max_persons]
 
+        # Store original object IDs for later use
+        original_obj_ids = list(out_obj_ids)
+
         # Propagate masks through video
         video_segments = {}
 
@@ -242,9 +245,11 @@ class Body4DProcess:
             else:
                 raise ValueError(f"Unexpected return format from propagate_in_video: {len(result)} values")
 
+            # Use original object IDs, not the ones from propagate_in_video
+            # (which may contain None values or different ordering)
             video_segments[frame_idx] = {
-                out_obj_id: (video_res_masks[i] > 0.0).cpu().numpy()
-                for i, out_obj_id in enumerate(out_obj_ids)
+                original_obj_ids[i]: (video_res_masks[i] > 0.0).cpu().numpy()
+                for i in range(len(obj_ids))
             }
 
         # Save masks to disk
@@ -277,7 +282,7 @@ class Body4DProcess:
 
             masks_dict[frame_idx] = mask_combined
 
-        return out_obj_ids, masks_dict
+        return original_obj_ids, masks_dict
 
     def _run_4d_generation(self, estimator, frame_paths, mask_dir, out_obj_ids, batch_size, inference_type):
         """Run SAM-3D-Body for 4D mesh estimation."""
