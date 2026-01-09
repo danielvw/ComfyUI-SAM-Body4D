@@ -148,7 +148,30 @@ class Body4DProcess:
         return frame_paths
 
     def _run_sam3_tracking(self, predictor, temp_dir, frame_paths, mask_dir, max_persons):
-        """Run SAM-3 video tracking for temporal consistency."""
+        """Run SAM-3 video tracking for temporal consistency.
+
+        Handles both sam-body4d and ComfyUI-SAM3 implementations:
+        - sam-body4d: Returns 6 values from propagate_in_video (includes iou_scores)
+        - ComfyUI-SAM3: Returns 5 values from propagate_in_video (no iou_scores)
+        """
+        # Detect which SAM-3 implementation is loaded
+        sam3_impl = "unknown"
+        if hasattr(predictor, 'bf16_context'):
+            # sam-body4d has bf16_context attribute
+            sam3_impl = "sam-body4d"
+        else:
+            # ComfyUI-SAM3 uses dynamic autocast
+            sam3_impl = "ComfyUI-SAM3"
+
+        print(f"[Body4D] Detected SAM-3 implementation: {sam3_impl}")
+
+        # Compatibility check: sam-body4d requires CUDA
+        if sam3_impl == "sam-body4d" and not torch.cuda.is_available():
+            raise RuntimeError(
+                "sam-body4d implementation requires CUDA but CUDA is not available. "
+                "Either use a CUDA-enabled environment or switch to ComfyUI-SAM3 implementation."
+            )
+
         # Initialize video state
         inference_state = predictor.init_state(video_path=str(temp_dir / "images"))
 
