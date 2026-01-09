@@ -285,9 +285,10 @@ class Body4DProcess:
             img = (img.numpy() * 255).astype("uint8")
 
             # Create combined mask image
+            # NOTE: Use obj_id + 1 to distinguish from background (0)
             mask_combined = np.zeros((out_h, out_w), dtype=np.uint8)
             for out_obj_id, out_mask in video_segments[frame_idx].items():
-                mask_combined[out_mask[0] > 0] = out_obj_id
+                mask_combined[out_mask[0] > 0] = out_obj_id + 1  # +1 to avoid 0 == background
 
             # Save mask
             mask_pil = Image.fromarray(mask_combined).convert('P')
@@ -325,7 +326,8 @@ class Body4DProcess:
 
                 for obj_id in out_obj_ids:
                     # Extract object mask
-                    obj_mask = (mask == obj_id).astype(np.uint8) * 255
+                    # NOTE: Masks stored with obj_id + 1 to distinguish from background
+                    obj_mask = (mask == (obj_id + 1)).astype(np.uint8) * 255
 
                     if obj_mask.sum() == 0:
                         continue
