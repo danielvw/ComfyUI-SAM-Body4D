@@ -134,6 +134,36 @@ for file_path in critical_files:
     status = "✓" if exists else "✗"
     print(f"   {status} {file_path.relative_to(SAM_BODY4D_PATH)}")
 
+# Test 6: Check config path resolution
+print("\n7. Testing config path resolution...")
+try:
+    # Simulate what load_model.py does for default config
+    config_base_path = Path(__file__).parent / "nodes" / "processing"
+    default_config = config_base_path.parent.parent / "configs" / "body4d.yaml"
+    print(f"   Default config path: {default_config}")
+    print(f"   Exists: {default_config.exists()}")
+
+    if default_config.exists():
+        print(f"   ✓ Config file found at correct location")
+    else:
+        print(f"   ✗ Config file NOT found")
+        print(f"   Expected at: {default_config.absolute()}")
+
+        # Check alternative locations
+        alt_locations = [
+            Path(__file__).parent / "configs" / "body4d.yaml",
+            SAM_BODY4D_PATH / "configs" / "body4d.yaml",
+        ]
+        print(f"\n   Checking alternative locations:")
+        for loc in alt_locations:
+            exists = loc.exists()
+            status = "✓" if exists else "✗"
+            print(f"   {status} {loc}")
+except Exception as e:
+    print(f"   ✗ ERROR: {e}")
+    import traceback
+    traceback.print_exc()
+
 print("\n" + "=" * 70)
 print("Test complete!")
 print("=" * 70)
