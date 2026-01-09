@@ -301,6 +301,7 @@ class Body4DProcess:
 
     def _run_4d_generation(self, estimator, frame_paths, mask_dir, out_obj_ids, batch_size, inference_type):
         """Run SAM-3D-Body for 4D mesh estimation."""
+        print(f"[Body4D] 4D Generation DEBUG: mask_dir={mask_dir}, out_obj_ids={out_obj_ids}")
         n_frames = len(frame_paths)
         person_outputs = {obj_id: [] for obj_id in out_obj_ids}
 
