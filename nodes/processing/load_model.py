@@ -141,36 +141,25 @@ class LoadBody4DModel:
             print(f"[Body4D] Using cached model: {cache_key}")
             model_bundle = self._model_cache[cache_key]
 
-            # CRITICAL: Apply BFloat16 input conversion patch for cached models
+            # CRITICAL: Ensure cached MHR model is in Float32
             estimator = model_bundle.get('estimator')
             if estimator and hasattr(estimator, 'model'):
                 if hasattr(estimator.model, 'head_pose') and hasattr(estimator.model.head_pose, 'mhr'):
                     try:
-                        # Check if already patched (has __wrapped__ attribute)
-                        if not hasattr(estimator.model.head_pose.mhr.forward, '__wrapped__'):
-                            print("[Body4D] Patching cached MHR model for BFloat16->Float32...")
-                            original_forward = estimator.model.head_pose.mhr.forward
-
-                            def mhr_forward_wrapper(*args, **kwargs):
-                                args_f32 = []
-                                for arg in args:
-                                    if isinstance(arg, torch.Tensor) and arg.dtype == torch.bfloat16:
-                                        args_f32.append(arg.to(torch.float32))
-                                    else:
-                                        args_f32.append(arg)
-                                kwargs_f32 = {}
-                                for k, v in kwargs.items():
-                                    if isinstance(v, torch.Tensor) and v.dtype == torch.bfloat16:
-                                        kwargs_f32[k] = v.to(torch.float32)
-                                    else:
-                                        kwargs_f32[k] = v
-                                return original_forward(*args_f32, **kwargs_f32)
-
-                            mhr_forward_wrapper.__wrapped__ = True  # Mark as patched
-                            estimator.model.head_pose.mhr.forward = mhr_forward_wrapper
-                            print("[Body4D] Cached MHR model patched successfully")
+                        mhr_model = estimator.model.head_pose.mhr
+                        # Check if already in Float32
+                        first_param_dtype = next(mhr_model.parameters()).dtype
+                        if first_param_dtype != torch.float32:
+                            print(f"[Body4D] Converting cached MHR from {first_param_dtype} to Float32...")
+                            device = next(mhr_model.parameters()).device
+                            mhr_model.cpu()
+                            mhr_model.float()
+                            mhr_model.to(device)
+                            print("[Body4D] Cached MHR model converted to Float32")
+                        else:
+                            print("[Body4D] Cached MHR model already in Float32")
                     except Exception as e:
-                        print(f"[Body4D] Warning: Could not patch cached MHR: {e}")
+                        print(f"[Body4D] Warning: Could not convert cached MHR: {e}")
 
             return (model_bundle,)
 
@@ -228,39 +217,28 @@ class LoadBody4DModel:
                 fov_estimator=fov_estimator,
             )
 
-            # CRITICAL: Patch MHR forward to convert inputs to Float32
+            # CRITICAL: Convert MHR TorchScript model to Float32
             # PyTorch CUDA doesn't support "addmm_sparse_cuda" with BFloat16
-            # TorchScript models have sub-modules that stay in BFloat16, so we wrap the forward method
-            print("[Body4D] Patching MHR model to handle BFloat16->Float32 conversion...")
+            # TorchScript models have baked-in sparse weights that must be converted
+            print("[Body4D] Converting MHR TorchScript model to Float32...")
             if hasattr(estimator.model, 'head_pose') and hasattr(estimator.model.head_pose, 'mhr'):
                 try:
-                    original_forward = estimator.model.head_pose.mhr.forward
+                    # Convert the entire TorchScript model to Float32
+                    # This converts all parameters, buffers, and constants including sparse tensors
+                    mhr_model = estimator.model.head_pose.mhr
 
-                    def mhr_forward_wrapper(*args, **kwargs):
-                        # Convert all tensor args/kwargs to float32
-                        args_f32 = []
-                        for arg in args:
-                            if isinstance(arg, torch.Tensor) and arg.dtype == torch.bfloat16:
-                                args_f32.append(arg.to(torch.float32))
-                            else:
-                                args_f32.append(arg)
+                    # Save current device
+                    device = next(mhr_model.parameters()).device
 
-                        kwargs_f32 = {}
-                        for k, v in kwargs.items():
-                            if isinstance(v, torch.Tensor) and v.dtype == torch.bfloat16:
-                                kwargs_f32[k] = v.to(torch.float32)
-                            else:
-                                kwargs_f32[k] = v
+                    # Move to CPU, convert to Float32, move back to device
+                    # This ensures sparse tensors are properly converted
+                    mhr_model.cpu()
+                    mhr_model.float()
+                    mhr_model.to(device)
 
-                        # Call original forward with float32 inputs
-                        result = original_forward(*args_f32, **kwargs_f32)
-                        return result
-
-                    mhr_forward_wrapper.__wrapped__ = True  # Mark as patched
-                    estimator.model.head_pose.mhr.forward = mhr_forward_wrapper
-                    print("[Body4D] MHR model patched for BFloat16->Float32 input conversion")
+                    print(f"[Body4D] MHR model converted to Float32 (device: {device})")
                 except Exception as e:
-                    print(f"[Body4D] Warning: Could not patch MHR forward: {e}")
+                    print(f"[Body4D] Warning: Could not convert MHR to Float32: {e}")
 
             # 3. Optional: Diffusion-VAS for occlusion
             pipeline_mask = None
