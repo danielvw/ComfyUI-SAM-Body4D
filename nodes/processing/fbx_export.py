@@ -125,12 +125,16 @@ class Body4DExportFBX:
             if not blender_script.exists():
                 raise FileNotFoundError(f"Blender script not found: {blender_script}")
 
+            # Resolve Blender executable path
+            blender_exec = self._resolve_blender_path(blender_path)
+            print(f"[Body4D] Using Blender: {blender_exec}")
+
             # Call Blender subprocess
             print(f"[Body4D] Calling Blender subprocess...")
             try:
                 result = subprocess.run(
                     [
-                        blender_path,
+                        blender_exec,
                         "--background",
                         "--python", str(blender_script),
                         "--",
@@ -165,7 +169,7 @@ class Body4DExportFBX:
                 )
             except FileNotFoundError:
                 raise FileNotFoundError(
-                    f"Blender executable not found: {blender_path}\n"
+                    f"Blender executable not found: {blender_exec}\n"
                     f"Please install Blender or specify correct path."
                 )
 
@@ -178,6 +182,48 @@ class Body4DExportFBX:
         print(f"  - Size: {fbx_path.stat().st_size / 1024:.1f} KB")
 
         return (str(fbx_path),)
+
+    def _resolve_blender_path(self, blender_path):
+        """
+        Resolve Blender executable path.
+
+        If blender_path is a directory, try to find the blender executable inside.
+        Common patterns: blender, blender.exe, Blender.app/Contents/MacOS/Blender
+        """
+        blender_path = Path(blender_path)
+
+        # If it's already an executable file, return it
+        if blender_path.is_file() and os.access(blender_path, os.X_OK):
+            return str(blender_path)
+
+        # If it's a directory, search for blender executable
+        if blender_path.is_dir():
+            # Try common locations
+            candidates = [
+                blender_path / "blender",               # Linux
+                blender_path / "blender.exe",           # Windows
+                blender_path / "Blender.app" / "Contents" / "MacOS" / "Blender",  # macOS
+                blender_path / "Contents" / "MacOS" / "Blender",  # macOS (if path is to .app)
+            ]
+
+            for candidate in candidates:
+                if candidate.is_file() and os.access(candidate, os.X_OK):
+                    return str(candidate)
+
+            raise FileNotFoundError(
+                f"Could not find Blender executable in directory: {blender_path}\n"
+                f"Tried: {[str(c) for c in candidates]}"
+            )
+
+        # If it's a command name (like "blender"), let subprocess find it
+        if not str(blender_path).startswith('/') and not str(blender_path).startswith('.'):
+            # Try to find it in PATH using shutil.which
+            found = shutil.which(str(blender_path))
+            if found:
+                return found
+
+        # Otherwise return as-is and let subprocess fail with helpful error
+        return str(blender_path)
 
     def _save_skeleton_json(self, animation, output_path):
         """Save skeleton animation data as JSON for Blender."""
