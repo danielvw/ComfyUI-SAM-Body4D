@@ -7,10 +7,9 @@ Loads SAM-Body4D pipeline components with model caching.
 import os
 import sys
 from pathlib import Path
-import torch
-from omegaconf import OmegaConf
 
-# Add sam-body4d to path
+# CRITICAL: Add sam-body4d to path BEFORE any other imports
+# This must happen before torch, omegaconf, or any sam-body4d modules are imported
 SAM_BODY4D_PATH = Path(__file__).parent.parent.parent.parent / "sam-body4d"
 if SAM_BODY4D_PATH.exists():
     # Remove any existing ComfyUI paths that might conflict
@@ -27,6 +26,10 @@ if SAM_BODY4D_PATH.exists():
         if path in sys.path:
             sys.path.remove(path)
         sys.path.insert(0, path)
+
+# Now import other modules
+import torch
+from omegaconf import OmegaConf
 
 
 class LoadBody4DModel:

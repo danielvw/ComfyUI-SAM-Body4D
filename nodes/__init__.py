@@ -4,6 +4,26 @@ ComfyUI-SAM-Body4D Nodes
 Aggregates all node mappings from processing modules.
 """
 
+import os
+import sys
+from pathlib import Path
+
+# CRITICAL: Setup sam-body4d paths BEFORE importing any nodes
+# This ensures all imports can find sam-body4d modules correctly
+SAM_BODY4D_PATH = Path(__file__).parent.parent / "sam-body4d"
+if SAM_BODY4D_PATH.exists():
+    paths_to_add = [
+        str(SAM_BODY4D_PATH),
+        str(SAM_BODY4D_PATH / "models"),
+        str(SAM_BODY4D_PATH / "models" / "sam_3d_body"),
+        str(SAM_BODY4D_PATH / "models" / "diffusion_vas"),
+    ]
+    for path in reversed(paths_to_add):
+        if path in sys.path:
+            sys.path.remove(path)
+        sys.path.insert(0, path)
+
+# Now import the nodes
 from .processing.load_model import NODE_CLASS_MAPPINGS as LOAD_MODEL_MAPPINGS
 from .processing.load_model import NODE_DISPLAY_NAME_MAPPINGS as LOAD_MODEL_DISPLAY_MAPPINGS
 from .processing.image_sequence import NODE_CLASS_MAPPINGS as IMAGE_SEQ_MAPPINGS
