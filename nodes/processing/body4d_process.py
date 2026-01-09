@@ -175,61 +175,65 @@ class Body4DProcess:
         # Initialize video state
         inference_state = predictor.init_state(video_path=str(temp_dir / "images"))
 
-        # Auto-detect humans in first frame using SAM-3's backbone
-        # We'll use a simple approach: add points in a grid pattern to detect all objects
+        # Auto-detect humans in first frame using SAM-3
+        # Strategy: Add points in different regions, each as a separate object with explicit ID
         first_frame = cv2.imread(frame_paths[0])
         h, w = first_frame.shape[:2]
 
-        # Add grid of points to detect objects automatically
-        # This is a simple auto-detection approach
-        grid_points = []
-        grid_labels = []
+        # Try to detect multiple persons by sampling different regions
+        # Create candidate points in a 3x2 grid (left, center, right) x (upper, lower body)
+        candidate_points = []
+        for y_ratio in [0.3, 0.6]:  # Upper body and lower body
+            for x_ratio in [0.25, 0.5, 0.75]:  # Left, center, right
+                candidate_points.append([w * x_ratio, h * y_ratio])
 
-        # Create a 3x3 grid of points
-        for y in np.linspace(h * 0.2, h * 0.8, 3):
-            for x in np.linspace(w * 0.2, w * 0.8, 3):
-                grid_points.append([x, y])
-                grid_labels.append(1)  # 1 = foreground point
+        # Add each candidate point as a separate object with explicit ID
+        out_obj_ids = []
+        detected_masks = []
 
-        # Add points to first frame
-        points = np.array(grid_points, dtype=np.float32)
-        labels = np.array(grid_labels, dtype=np.int32)
+        for idx, point in enumerate(candidate_points[:max_persons]):
+            # Add point as object with explicit ID (not None)
+            obj_id = idx
+            points = np.array([[point[0], point[1]]], dtype=np.float32)
+            labels = np.array([1], dtype=np.int32)  # 1 = foreground
 
-        # Use SAM-3's add_new_points_or_box to detect objects
-        # Returns: (frame_idx, obj_ids, low_res_masks, video_res_masks)
-        result = predictor.add_new_points_or_box(
-            inference_state=inference_state,
-            frame_idx=0,
-            obj_id=None,  # Auto-assign object IDs
-            points=points,
-            labels=labels,
-        )
+            try:
+                result = predictor.add_new_points_or_box(
+                    inference_state=inference_state,
+                    frame_idx=0,
+                    obj_id=obj_id,  # Explicit ID, not None
+                    points=points,
+                    labels=labels,
+                )
 
-        # Handle different return formats
-        # SAM-3 returns: (frame_idx, obj_ids, low_res_masks, video_res_masks)
-        if len(result) == 2:
-            out_obj_ids, out_mask_logits = result
-        elif len(result) == 3:
-            _, out_obj_ids, out_mask_logits = result
-        elif len(result) == 4:
-            # Format: (frame_idx, obj_ids, low_res_masks, video_res_masks)
-            _, out_obj_ids, _, out_mask_logits = result
-        else:
-            raise ValueError(f"Unexpected return format from add_new_points_or_box: {len(result)} values")
+                # Handle different return formats
+                if len(result) == 2:
+                    returned_obj_ids, out_mask_logits = result
+                elif len(result) == 3:
+                    _, returned_obj_ids, out_mask_logits = result
+                elif len(result) == 4:
+                    _, returned_obj_ids, _, out_mask_logits = result
+                else:
+                    raise ValueError(f"Unexpected return format: {len(result)} values")
 
-        print(f"[Body4D] Auto-detected {len(out_obj_ids)} object(s) in first frame")
+                # Check if detection was successful (non-empty mask)
+                if out_mask_logits is not None and out_mask_logits.numel() > 0:
+                    out_obj_ids.append(obj_id)
+                    detected_masks.append(out_mask_logits)
+                    print(f"[Body4D] Detected object {obj_id} at ({point[0]:.0f}, {point[1]:.0f})")
+
+            except Exception as e:
+                print(f"[Body4D] Failed to detect at ({point[0]:.0f}, {point[1]:.0f}): {e}")
+                continue
+
+        if len(out_obj_ids) == 0:
+            raise RuntimeError("No objects detected in first frame. Try different detection threshold.")
+
+        print(f"[Body4D] Successfully detected {len(out_obj_ids)} object(s)")
         print(f"[Body4D] Object IDs: {out_obj_ids}")
 
-        # Limit to max_persons
-        out_obj_ids = out_obj_ids[:max_persons]
-
-        # Filter out None values and convert to list
-        original_obj_ids = [obj_id for obj_id in out_obj_ids if obj_id is not None]
-
-        if len(original_obj_ids) == 0:
-            raise RuntimeError("No valid object IDs detected (all None). SAM-3 detection may have failed.")
-
-        print(f"[Body4D] Filtered object IDs (excluding None): {original_obj_ids}")
+        # Store original object IDs for tracking
+        original_obj_ids = out_obj_ids
 
         # Propagate masks through video
         video_segments = {}
