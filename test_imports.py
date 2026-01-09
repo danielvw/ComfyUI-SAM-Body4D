@@ -19,6 +19,8 @@ print(f"\nCurrent working directory: {os.getcwd()}")
 
 # Setup paths (simulate what nodes/__init__.py does)
 print("\n1. Setting up sys.path...")
+# sam-body4d is a sibling directory in custom_nodes/
+# Path: test_imports.py -> ComfyUI-SAM-Body4D/ -> custom_nodes/ -> sam-body4d/
 SAM_BODY4D_PATH = Path(__file__).parent.parent / "sam-body4d"
 print(f"   SAM_BODY4D_PATH: {SAM_BODY4D_PATH}")
 print(f"   Exists: {SAM_BODY4D_PATH.exists()}")

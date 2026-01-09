@@ -10,8 +10,9 @@ from pathlib import Path
 
 # CRITICAL: Add sam-body4d to path BEFORE any other imports
 # This must happen before torch, omegaconf, or any sam-body4d modules are imported
-# Path: nodes/processing/load_model.py -> nodes/ -> ComfyUI-SAM-Body4D/ -> sam-body4d/
-SAM_BODY4D_PATH = Path(__file__).parent.parent.parent / "sam-body4d"
+# sam-body4d is a sibling directory in custom_nodes/
+# Path: nodes/processing/load_model.py -> nodes/ -> ComfyUI-SAM-Body4D/ -> custom_nodes/ -> sam-body4d/
+SAM_BODY4D_PATH = Path(__file__).parent.parent.parent.parent / "sam-body4d"
 if SAM_BODY4D_PATH.exists():
     # Package structure: models/sam_3d_body/sam_3d_body (inner package)
     # Outer __init__.py is empty, so we add parent directory

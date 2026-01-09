@@ -10,7 +10,9 @@ from pathlib import Path
 
 # CRITICAL: Setup sam-body4d paths BEFORE importing any nodes
 # This ensures all imports can find sam-body4d modules correctly
-SAM_BODY4D_PATH = Path(__file__).parent.parent / "sam-body4d"
+# sam-body4d is a sibling directory in custom_nodes/
+# Path: nodes/__init__.py -> nodes/ -> ComfyUI-SAM-Body4D/ -> custom_nodes/ -> sam-body4d/
+SAM_BODY4D_PATH = Path(__file__).parent.parent.parent / "sam-body4d"
 if SAM_BODY4D_PATH.exists():
     # Package structure: models/sam_3d_body/sam_3d_body (inner package)
     # Outer __init__.py is empty, so we add parent directory
