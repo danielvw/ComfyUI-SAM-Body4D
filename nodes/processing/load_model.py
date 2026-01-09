@@ -13,9 +13,19 @@ from omegaconf import OmegaConf
 # Add sam-body4d to path
 SAM_BODY4D_PATH = Path(__file__).parent.parent.parent.parent / "sam-body4d"
 if SAM_BODY4D_PATH.exists():
-    sys.path.insert(0, str(SAM_BODY4D_PATH))
-    sys.path.insert(0, str(SAM_BODY4D_PATH / "models" / "sam_3d_body"))
-    sys.path.insert(0, str(SAM_BODY4D_PATH / "models" / "diffusion_vas"))
+    # Remove any existing ComfyUI paths that might conflict
+    # Insert sam-body4d paths at the very beginning to avoid conflicts with ComfyUI's utils
+    paths_to_add = [
+        str(SAM_BODY4D_PATH),
+        str(SAM_BODY4D_PATH / "models"),
+        str(SAM_BODY4D_PATH / "models" / "sam_3d_body"),
+        str(SAM_BODY4D_PATH / "models" / "sam_3d_body" / "sam_3d_body"),
+        str(SAM_BODY4D_PATH / "models" / "diffusion_vas"),
+    ]
+    for path in reversed(paths_to_add):
+        if path in sys.path:
+            sys.path.remove(path)
+        sys.path.insert(0, path)
 
 
 class LoadBody4DModel:
