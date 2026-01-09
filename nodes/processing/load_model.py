@@ -12,16 +12,25 @@ from pathlib import Path
 # This must happen before torch, omegaconf, or any sam-body4d modules are imported
 SAM_BODY4D_PATH = Path(__file__).parent.parent.parent.parent / "sam-body4d"
 if SAM_BODY4D_PATH.exists():
-    # Remove any existing ComfyUI paths that might conflict
-    # Insert sam-body4d paths at the very beginning to avoid conflicts with ComfyUI's utils
-    # IMPORTANT: sam_3d_body package structure is models/sam_3d_body/sam_3d_body/
-    # We need to add the INNER sam_3d_body directory to sys.path
+    # Package structure: models/sam_3d_body/sam_3d_body (inner package)
+    # Outer __init__.py is empty, so we add parent directory
     paths_to_add = [
         str(SAM_BODY4D_PATH),
-        str(SAM_BODY4D_PATH / "models"),
-        str(SAM_BODY4D_PATH / "models" / "sam_3d_body" / "sam_3d_body"),  # INNER package
+        str(SAM_BODY4D_PATH / "models" / "sam_3d_body"),  # Parent of inner package
         str(SAM_BODY4D_PATH / "models" / "diffusion_vas"),
     ]
+
+    # Remove conflicting sam_3d_body paths from other custom nodes
+    paths_to_remove = []
+    for existing_path in sys.path:
+        if 'sam_3d_body' in existing_path.lower() or 'sam3d' in existing_path.lower():
+            if existing_path not in paths_to_add:
+                paths_to_remove.append(existing_path)
+
+    for path in paths_to_remove:
+        sys.path.remove(path)
+
+    # Add our paths at the beginning
     for path in reversed(paths_to_add):
         if path in sys.path:
             sys.path.remove(path)
