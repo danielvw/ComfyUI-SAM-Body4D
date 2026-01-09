@@ -119,6 +119,16 @@ class LoadBody4DModel:
                     sys.path.remove(path)
                 sys.path.insert(0, path)
 
+            # CRITICAL: Remove cached modules that might be from wrong paths
+            # Python caches modules, so we need to clear conflicting ones
+            modules_to_remove = [
+                key for key in sys.modules.keys()
+                if key == 'utils' or key.startswith('utils.')
+                or key == 'sam_3d_body' or key.startswith('sam_3d_body.')
+            ]
+            for mod in modules_to_remove:
+                del sys.modules[mod]
+
         # Cache key
         cache_key = f"{config_path}_{enable_occlusion}_{batch_size}"
 
