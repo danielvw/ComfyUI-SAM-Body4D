@@ -141,16 +141,6 @@ class LoadBody4DModel:
             print(f"[Body4D] Using cached model: {cache_key}")
             model_bundle = self._model_cache[cache_key]
 
-            # Check if MHR is already wrapped for Float32 execution
-            estimator = model_bundle.get('estimator')
-            if estimator and hasattr(estimator, 'model'):
-                if hasattr(estimator.model, 'head_pose'):
-                    head_pose = estimator.model.head_pose
-                    if hasattr(head_pose, '_mhr_f32_wrapped') and head_pose._mhr_f32_wrapped:
-                        print("[Body4D] Cached MHR already wrapped for Float32")
-                    else:
-                        print("[Body4D] Warning: Cached MHR not wrapped - may cause BFloat16 errors")
-
             return (model_bundle,)
 
         print(f"[Body4D] Loading models from: {config_path}")
@@ -207,46 +197,8 @@ class LoadBody4DModel:
                 fov_estimator=fov_estimator,
             )
 
-            # CRITICAL: Wrap self.mhr to disable autocast and force Float32
-            # PyTorch CUDA doesn't support "addmm_sparse_cuda" with BFloat16
-            # The BFloat16 comes from autocast - we need to disable it for MHR calls
-            print("[Body4D] Wrapping MHR to disable autocast (BFloat16 sparse workaround)...")
-            if hasattr(estimator.model, 'head_pose') and hasattr(estimator.model.head_pose, 'mhr'):
-                head_pose = estimator.model.head_pose
-                try:
-                    original_mhr = head_pose.mhr
-                    # Convert model to float32 (this converts parameters, not constants)
-                    original_mhr.float()
-
-                    class MHRFloat32Wrapper:
-                        """Wrapper that disables autocast and forces Float32 for MHR."""
-                        def __init__(self, mhr_model):
-                            self.mhr_model = mhr_model
-
-                        def __call__(self, shape_params, model_params, expr_params):
-                            # Disable autocast to prevent BFloat16 conversion
-                            with torch.cuda.amp.autocast(enabled=False):
-                                # Convert inputs to float32
-                                shape_f32 = shape_params.float()
-                                model_f32 = model_params.float()
-                                expr_f32 = expr_params.float() if expr_params is not None else None
-
-                                # Run model in float32
-                                verts, skel_state = self.mhr_model(shape_f32, model_f32, expr_f32)
-
-                                return verts, skel_state
-
-                        def __getattr__(self, name):
-                            # Forward all other attribute access to the original model
-                            return getattr(self.mhr_model, name)
-
-                    head_pose.mhr = MHRFloat32Wrapper(original_mhr)
-                    head_pose._mhr_f32_wrapped = True
-                    print("[Body4D] MHR wrapped to disable autocast and force Float32")
-                except Exception as e:
-                    print(f"[Body4D] Warning: Could not wrap MHR: {e}")
-                    import traceback
-                    traceback.print_exc()
+            # NOTE: MHR BFloat16 sparse ops fix is now in sam-body4d/models/sam_3d_body/sam_3d_body/models/heads/mhr_head.py
+            # The MHR model is loaded on CPU and inputs/outputs are moved between CPU/GPU automatically
 
             # 3. Optional: Diffusion-VAS for occlusion
             pipeline_mask = None
