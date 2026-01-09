@@ -173,13 +173,22 @@ class Body4DProcess:
         labels = np.array(grid_labels, dtype=np.int32)
 
         # Use SAM-3's add_new_points_or_box to detect objects
-        _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
+        # Returns: (frame_idx, out_obj_ids, out_mask_logits)
+        result = predictor.add_new_points_or_box(
             inference_state=inference_state,
             frame_idx=0,
             obj_id=None,  # Auto-assign object IDs
             points=points,
             labels=labels,
         )
+
+        # Handle different return formats
+        if len(result) == 2:
+            out_obj_ids, out_mask_logits = result
+        elif len(result) == 3:
+            _, out_obj_ids, out_mask_logits = result
+        else:
+            raise ValueError(f"Unexpected return format from add_new_points_or_box: {len(result)} values")
 
         print(f"[Body4D] Auto-detected {len(out_obj_ids)} object(s) in first frame")
 
