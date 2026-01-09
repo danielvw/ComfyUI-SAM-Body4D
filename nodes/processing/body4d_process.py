@@ -218,12 +218,18 @@ class Body4DProcess:
             raise ValueError(f"Unexpected return format from add_new_points_or_box: {len(result)} values")
 
         print(f"[Body4D] Auto-detected {len(out_obj_ids)} object(s) in first frame")
+        print(f"[Body4D] Object IDs: {out_obj_ids}")
 
         # Limit to max_persons
         out_obj_ids = out_obj_ids[:max_persons]
 
-        # Store original object IDs for later use
-        original_obj_ids = list(out_obj_ids)
+        # Filter out None values and convert to list
+        original_obj_ids = [obj_id for obj_id in out_obj_ids if obj_id is not None]
+
+        if len(original_obj_ids) == 0:
+            raise RuntimeError("No valid object IDs detected (all None). SAM-3 detection may have failed.")
+
+        print(f"[Body4D] Filtered object IDs (excluding None): {original_obj_ids}")
 
         # Propagate masks through video
         video_segments = {}
@@ -247,10 +253,14 @@ class Body4DProcess:
 
             # Use original object IDs, not the ones from propagate_in_video
             # (which may contain None values or different ordering)
-            video_segments[frame_idx] = {
-                original_obj_ids[i]: (video_res_masks[i] > 0.0).cpu().numpy()
-                for i in range(len(obj_ids))
-            }
+            # Match up masks with valid object IDs only
+            video_segments[frame_idx] = {}
+            for i, returned_obj_id in enumerate(obj_ids):
+                # Find corresponding original object ID
+                # If obj_ids contains valid IDs, match them; otherwise use index mapping
+                if i < len(original_obj_ids):
+                    obj_id = original_obj_ids[i]
+                    video_segments[frame_idx][obj_id] = (video_res_masks[i] > 0.0).cpu().numpy()
 
         # Save masks to disk
         out_h = inference_state['video_height']
