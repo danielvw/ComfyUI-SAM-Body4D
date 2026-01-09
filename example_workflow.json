@@ -4,9 +4,9 @@
   "nodes": [
     {
       "id": 1,
-      "type": "LoadImage",
+      "type": "LoadImageBatch",
       "pos": [50, 100],
-      "size": [315, 314],
+      "size": [315, 240],
       "flags": {},
       "order": 0,
       "mode": 0,
@@ -19,18 +19,20 @@
           "slot_index": 0
         },
         {
-          "name": "MASK",
-          "type": "MASK",
+          "name": "frame_count",
+          "type": "INT",
           "links": null,
           "shape": 3
         }
       ],
       "properties": {
-        "Node name for S&R": "LoadImage"
+        "Node name for S&R": "LoadImageBatch"
       },
       "widgets_values": [
         "example_video_frames",
-        "image"
+        "*.png",
+        0,
+        0
       ],
       "title": "Load Video Frames"
     },
@@ -285,7 +287,7 @@
         "text": ""
       },
       "widgets_values": [
-        "SAM-Body4D Workflow\n\nThis workflow:\n1. Loads a video as image sequence\n2. Prepares frames with FPS settings\n3. Loads SAM-Body4D models (SAM-3 + SAM-3D-Body)\n4. Processes the sequence (tracking + 3D mesh estimation)\n5. Extracts skeleton animation from the first detected person\n6. Exports animated FBX file with Blender\n\nRequirements:\n- SAM-Body4D installed in ComfyUI/custom_nodes/sam-body4d/\n- Model checkpoints downloaded\n- Blender installed (for FBX export)\n- 15-20 GB VRAM (40+ GB with occlusion handling)"
+        "SAM-Body4D Workflow\n\nThis workflow:\n1. Loads image sequence from directory (use LoadImageBatch)\n2. Prepares frames with FPS settings\n3. Loads SAM-Body4D models (SAM-3 + SAM-3D-Body)\n4. Processes the sequence (tracking + 3D mesh estimation)\n5. Extracts skeleton animation from the first detected person\n6. Exports animated FBX file with Blender\n\nLoadImageBatch Node:\n- directory: Path to folder with images (e.g., 'my_video_frames')\n- pattern: Glob pattern (e.g., '*.png', 'frame_*.jpg')\n- start_index: Skip first N frames (optional)\n- max_frames: Limit frame count (0 = all)\n\nRequirements:\n- SAM-Body4D installed in ComfyUI/custom_nodes/sam-body4d/\n- Model checkpoints downloaded (see configs/CHECKPOINTS.md)\n- Blender installed (for FBX export)\n- 15-20 GB VRAM (40+ GB with occlusion handling)"
       ],
       "color": "#432",
       "bgcolor": "#653",
