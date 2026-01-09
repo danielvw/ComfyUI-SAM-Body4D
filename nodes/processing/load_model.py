@@ -139,7 +139,23 @@ class LoadBody4DModel:
         # Check cache
         if cache_key in self._model_cache:
             print(f"[Body4D] Using cached model: {cache_key}")
-            return (self._model_cache[cache_key],)
+            model_bundle = self._model_cache[cache_key]
+
+            # CRITICAL: Apply Float32 conversion even for cached models
+            # This ensures compatibility after code updates
+            estimator = model_bundle.get('estimator')
+            if estimator and hasattr(estimator, 'model'):
+                if hasattr(estimator.model, 'head_pose') and hasattr(estimator.model.head_pose, 'mhr'):
+                    try:
+                        mhr_dtype = next(estimator.model.head_pose.mhr.parameters()).dtype
+                        if mhr_dtype == torch.bfloat16:
+                            print("[Body4D] Converting cached MHR model from BFloat16 to Float32...")
+                            estimator.model.head_pose.mhr = estimator.model.head_pose.mhr.to(torch.float32)
+                            print("[Body4D] Cached MHR model converted to Float32")
+                    except Exception as e:
+                        print(f"[Body4D] Warning: Could not convert cached MHR: {e}")
+
+            return (model_bundle,)
 
         print(f"[Body4D] Loading models from: {config_path}")
 
