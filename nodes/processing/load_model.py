@@ -94,6 +94,31 @@ class LoadBody4DModel:
         Returns:
             Tuple containing model bundle dict
         """
+        # CRITICAL: Re-apply path fixes at runtime in case other nodes modified sys.path
+        # This must happen EVERY time, not just at module import
+        if SAM_BODY4D_PATH.exists():
+            paths_to_add = [
+                str(SAM_BODY4D_PATH),
+                str(SAM_BODY4D_PATH / "models" / "sam_3d_body"),
+                str(SAM_BODY4D_PATH / "models" / "diffusion_vas"),
+            ]
+
+            # Remove conflicting paths
+            paths_to_remove = []
+            for existing_path in sys.path:
+                if 'sam_3d_body' in existing_path.lower() or 'sam3d' in existing_path.lower():
+                    if existing_path not in paths_to_add:
+                        paths_to_remove.append(existing_path)
+
+            for path in paths_to_remove:
+                sys.path.remove(path)
+
+            # Add our paths at the beginning
+            for path in reversed(paths_to_add):
+                if path in sys.path:
+                    sys.path.remove(path)
+                sys.path.insert(0, path)
+
         # Cache key
         cache_key = f"{config_path}_{enable_occlusion}_{batch_size}"
 
