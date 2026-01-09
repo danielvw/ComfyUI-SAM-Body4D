@@ -152,13 +152,42 @@ class Body4DProcess:
         # Initialize video state
         inference_state = predictor.init_state(video_path=str(temp_dir / "images"))
 
-        # Auto-detect humans in first frame
-        # For simplicity, we'll detect all humans automatically
-        # In practice, you might want to add user prompts
+        # Auto-detect humans in first frame using SAM-3's backbone
+        # We'll use a simple approach: add points in a grid pattern to detect all objects
+        first_frame = cv2.imread(frame_paths[0])
+        h, w = first_frame.shape[:2]
+
+        # Add grid of points to detect objects automatically
+        # This is a simple auto-detection approach
+        grid_points = []
+        grid_labels = []
+
+        # Create a 3x3 grid of points
+        for y in np.linspace(h * 0.2, h * 0.8, 3):
+            for x in np.linspace(w * 0.2, w * 0.8, 3):
+                grid_points.append([x, y])
+                grid_labels.append(1)  # 1 = foreground point
+
+        # Add points to first frame
+        points = np.array(grid_points, dtype=np.float32)
+        labels = np.array(grid_labels, dtype=np.int32)
+
+        # Use SAM-3's add_new_points_or_box to detect objects
+        _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
+            inference_state=inference_state,
+            frame_idx=0,
+            obj_id=None,  # Auto-assign object IDs
+            points=points,
+            labels=labels,
+        )
+
+        print(f"[Body4D] Auto-detected {len(out_obj_ids)} object(s) in first frame")
+
+        # Limit to max_persons
+        out_obj_ids = out_obj_ids[:max_persons]
 
         # Propagate masks through video
         video_segments = {}
-        out_obj_ids = []
 
         for frame_idx, obj_ids, low_res_masks, video_res_masks, obj_scores, iou_scores in predictor.propagate_in_video(
             inference_state,
@@ -167,9 +196,6 @@ class Body4DProcess:
             reverse=False,
             propagate_preflight=True,
         ):
-            if not out_obj_ids:
-                out_obj_ids = obj_ids[:max_persons]
-
             video_segments[frame_idx] = {
                 out_obj_id: (video_res_masks[i] > 0.0).cpu().numpy()
                 for i, out_obj_id in enumerate(out_obj_ids)
