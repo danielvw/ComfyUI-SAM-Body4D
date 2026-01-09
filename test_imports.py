@@ -24,10 +24,12 @@ print(f"   SAM_BODY4D_PATH: {SAM_BODY4D_PATH}")
 print(f"   Exists: {SAM_BODY4D_PATH.exists()}")
 
 if SAM_BODY4D_PATH.exists():
+    # FIXED: Add the INNER sam_3d_body directory, not the outer one
+    # The package structure is: models/sam_3d_body/sam_3d_body (inner has the actual package)
     paths_to_add = [
         str(SAM_BODY4D_PATH),
         str(SAM_BODY4D_PATH / "models"),
-        str(SAM_BODY4D_PATH / "models" / "sam_3d_body"),
+        str(SAM_BODY4D_PATH / "models" / "sam_3d_body" / "sam_3d_body"),  # INNER package!
         str(SAM_BODY4D_PATH / "models" / "diffusion_vas"),
     ]
 
