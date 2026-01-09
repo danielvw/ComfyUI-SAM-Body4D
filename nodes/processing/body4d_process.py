@@ -305,10 +305,19 @@ class Body4DProcess:
         n_frames = len(frame_paths)
         person_outputs = {obj_id: [] for obj_id in out_obj_ids}
 
+        # Check if mask files exist
+        import os
+        mask_files = list(mask_dir.glob("*.png")) if hasattr(mask_dir, 'glob') else []
+        print(f"[Body4D] DEBUG: Found {len(mask_files)} mask files in {mask_dir}")
+        if len(mask_files) > 0:
+            print(f"[Body4D] DEBUG: First mask file: {mask_files[0]}")
+
         # Process in batches
         for i in range(0, n_frames, batch_size):
             batch_frames = frame_paths[i:i + batch_size]
             batch_masks = [str(mask_dir / f"{j:08d}.png") for j in range(i, min(i + batch_size, n_frames))]
+            print(f"[Body4D] DEBUG: Processing batch {i}, frames {i} to {min(i + batch_size, n_frames)}")
+            print(f"[Body4D] DEBUG: First batch mask path: {batch_masks[0] if batch_masks else 'NONE'}")
 
             # Prepare bboxes and masks for each frame
             bboxes_batch = []
@@ -316,8 +325,14 @@ class Body4DProcess:
             id_batch = []
 
             for frame_idx, (frame_path, mask_path) in enumerate(zip(batch_frames, batch_masks)):
+                # Check if mask file exists
+                if not os.path.exists(mask_path):
+                    print(f"[Body4D] ERROR: Mask file does not exist: {mask_path}")
+                    continue
+
                 # Load mask
                 mask = np.array(Image.open(mask_path).convert('P'))
+                print(f"[Body4D] DEBUG: Frame {i + frame_idx}: mask shape={mask.shape}, unique values={np.unique(mask)}")
                 img = cv2.imread(frame_path)
                 H, W = img.shape[:2]
 
