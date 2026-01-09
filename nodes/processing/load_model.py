@@ -57,10 +57,12 @@ class LoadBody4DModel:
 
     @classmethod
     def INPUT_TYPES(cls):
+        # Default to the configs/ directory in the ComfyUI-SAM-Body4D repository
+        default_config = str(Path(__file__).parent.parent.parent / "configs" / "body4d.yaml")
         return {
             "required": {
                 "config_path": ("STRING", {
-                    "default": str(SAM_BODY4D_PATH / "configs" / "body4d.yaml"),
+                    "default": default_config,
                     "tooltip": "Path to SAM-Body4D configuration YAML"
                 }),
                 "enable_occlusion": ("BOOLEAN", {
