@@ -359,7 +359,8 @@ class Body4DProcess:
                         bbox_list.append(bbox)
                         # Add channel dimension: (H, W) -> (H, W, 1)
                         mask_list.append(obj_mask[:, :, np.newaxis])
-                        id_list.append(obj_id)
+                        # SAM-3D-Body expects 1-indexed IDs in id_batch
+                        id_list.append(obj_id + 1)
 
                 if len(bbox_list) > 0:
                     bboxes_batch.append(np.concatenate(bbox_list, axis=0))
@@ -399,11 +400,13 @@ class Body4DProcess:
                 print(f"[Body4D] DEBUG: First output type={type(outputs_batch[0])}")
 
             # Organize outputs by person
+            # NOTE: ids are 1-indexed (for SAM-3D-Body), convert back to 0-indexed for our dict
             for idx, (frame_outputs, ids) in enumerate(zip(outputs_batch, id_batch)):
                 print(f"[Body4D] DEBUG: frame_outputs type={type(frame_outputs)}, len={len(frame_outputs) if hasattr(frame_outputs, '__len__') else 'N/A'}, ids={ids}")
                 if len(frame_outputs) == 0:
                     print(f"[Body4D] WARNING: Frame {idx} returned EMPTY outputs from estimator!")
-                for person_output, person_id in zip(frame_outputs, ids):
+                for person_output, person_id_1indexed in zip(frame_outputs, ids):
+                    person_id = person_id_1indexed - 1  # Convert back to 0-indexed
                     person_outputs[person_id].append(person_output)
                     print(f"[Body4D] DEBUG: Added output for person {person_id}")
 
