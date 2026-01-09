@@ -197,8 +197,9 @@ class LoadBody4DModel:
                 fov_estimator=fov_estimator,
             )
 
-            # NOTE: MHR BFloat16 sparse ops fix is now in sam-body4d/models/sam_3d_body/sam_3d_body/models/heads/mhr_head.py
-            # The MHR model is loaded on CPU and inputs/outputs are moved between CPU/GPU automatically
+            # NOTE: MHR BFloat16 sparse ops fix is in body4d_process.py
+            # We disable autocast during SAM-3D-Body inference to prevent BFloat16 tensors
+            # PyTorch CUDA doesn't support "addmm_sparse_cuda" with BFloat16
 
             # 3. Optional: Diffusion-VAS for occlusion
             pipeline_mask = None
