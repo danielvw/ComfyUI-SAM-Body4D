@@ -141,13 +141,13 @@ class LoadBody4DModel:
             print(f"[Body4D] Using cached model: {cache_key}")
             model_bundle = self._model_cache[cache_key]
 
-            # Check if MHR is already wrapped for CPU execution
+            # Check if MHR is already wrapped for Float32 execution
             estimator = model_bundle.get('estimator')
             if estimator and hasattr(estimator, 'model'):
                 if hasattr(estimator.model, 'head_pose'):
                     head_pose = estimator.model.head_pose
-                    if hasattr(head_pose, '_mhr_cpu_wrapped') and head_pose._mhr_cpu_wrapped:
-                        print("[Body4D] Cached MHR already wrapped for CPU")
+                    if hasattr(head_pose, '_mhr_f32_wrapped') and head_pose._mhr_f32_wrapped:
+                        print("[Body4D] Cached MHR already wrapped for Float32")
                     else:
                         print("[Body4D] Warning: Cached MHR not wrapped - may cause BFloat16 errors")
 
@@ -207,46 +207,42 @@ class LoadBody4DModel:
                 fov_estimator=fov_estimator,
             )
 
-            # CRITICAL: Wrap self.mhr to run on CPU
+            # CRITICAL: Wrap self.mhr to disable autocast and force Float32
             # PyTorch CUDA doesn't support "addmm_sparse_cuda" with BFloat16
-            # TorchScript constants are baked in and can't be converted
-            # Solution: Run MHR model on CPU (where BFloat16 sparse ops work)
-            print("[Body4D] Wrapping MHR to run on CPU (BFloat16 sparse workaround)...")
+            # The BFloat16 comes from autocast - we need to disable it for MHR calls
+            print("[Body4D] Wrapping MHR to disable autocast (BFloat16 sparse workaround)...")
             if hasattr(estimator.model, 'head_pose') and hasattr(estimator.model.head_pose, 'mhr'):
                 head_pose = estimator.model.head_pose
                 try:
-                    # Move MHR model to CPU permanently
                     original_mhr = head_pose.mhr
-                    original_mhr.cpu()
+                    # Convert model to float32 (this converts parameters, not constants)
                     original_mhr.float()
 
-                    class MHRCPUWrapper:
-                        """Wrapper that runs MHR on CPU and moves results back to GPU."""
+                    class MHRFloat32Wrapper:
+                        """Wrapper that disables autocast and forces Float32 for MHR."""
                         def __init__(self, mhr_model):
                             self.mhr_model = mhr_model
 
                         def __call__(self, shape_params, model_params, expr_params):
-                            # Remember original device
-                            original_device = shape_params.device
+                            # Disable autocast to prevent BFloat16 conversion
+                            with torch.cuda.amp.autocast(enabled=False):
+                                # Convert inputs to float32
+                                shape_f32 = shape_params.float()
+                                model_f32 = model_params.float()
+                                expr_f32 = expr_params.float() if expr_params is not None else None
 
-                            # Move inputs to CPU and convert to float32
-                            shape_cpu = shape_params.detach().cpu().float()
-                            model_cpu = model_params.detach().cpu().float()
-                            expr_cpu = expr_params.detach().cpu().float() if expr_params is not None else None
+                                # Run model in float32
+                                verts, skel_state = self.mhr_model(shape_f32, model_f32, expr_f32)
 
-                            # Run on CPU
-                            verts, skel_state = self.mhr_model(shape_cpu, model_cpu, expr_cpu)
-
-                            # Move results back to original device
-                            return verts.to(original_device), skel_state.to(original_device)
+                                return verts, skel_state
 
                         def __getattr__(self, name):
                             # Forward all other attribute access to the original model
                             return getattr(self.mhr_model, name)
 
-                    head_pose.mhr = MHRCPUWrapper(original_mhr)
-                    head_pose._mhr_cpu_wrapped = True
-                    print("[Body4D] MHR wrapped to run on CPU")
+                    head_pose.mhr = MHRFloat32Wrapper(original_mhr)
+                    head_pose._mhr_f32_wrapped = True
+                    print("[Body4D] MHR wrapped to disable autocast and force Float32")
                 except Exception as e:
                     print(f"[Body4D] Warning: Could not wrap MHR: {e}")
                     import traceback
