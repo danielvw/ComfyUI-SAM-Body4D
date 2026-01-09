@@ -24,12 +24,12 @@ print(f"   SAM_BODY4D_PATH: {SAM_BODY4D_PATH}")
 print(f"   Exists: {SAM_BODY4D_PATH.exists()}")
 
 if SAM_BODY4D_PATH.exists():
-    # FIXED: Add the INNER sam_3d_body directory, not the outer one
-    # The package structure is: models/sam_3d_body/sam_3d_body (inner has the actual package)
-    # IMPORTANT: Do NOT add models/sam_3d_body, only the inner package!
+    # FIXED: The package structure is: models/sam_3d_body/sam_3d_body (inner package)
+    # The outer models/sam_3d_body/__init__.py is empty, so we add models/sam_3d_body to path
+    # This makes 'sam_3d_body' resolve to the inner package at models/sam_3d_body/sam_3d_body/
     paths_to_add = [
         str(SAM_BODY4D_PATH),
-        str(SAM_BODY4D_PATH / "models" / "sam_3d_body" / "sam_3d_body"),  # INNER package!
+        str(SAM_BODY4D_PATH / "models" / "sam_3d_body"),  # Parent of inner package
         str(SAM_BODY4D_PATH / "models" / "diffusion_vas"),
     ]
 
@@ -38,6 +38,19 @@ if SAM_BODY4D_PATH.exists():
         exists = Path(path).exists()
         print(f"   - {path} [{'EXISTS' if exists else 'MISSING'}]")
 
+    # CRITICAL: Remove ALL existing sam_3d_body paths from other custom nodes (like ComfyUI-SAM3DBody)
+    print("\n   Cleaning up conflicting paths...")
+    paths_to_remove = []
+    for existing_path in sys.path:
+        if 'sam_3d_body' in existing_path.lower() or 'sam3d' in existing_path.lower():
+            if existing_path not in paths_to_add:
+                paths_to_remove.append(existing_path)
+                print(f"   - Removing: {existing_path}")
+
+    for path in paths_to_remove:
+        sys.path.remove(path)
+
+    # Now add our paths at the very beginning
     for path in reversed(paths_to_add):
         if path in sys.path:
             sys.path.remove(path)
