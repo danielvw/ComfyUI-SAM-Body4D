@@ -1,0 +1,26 @@
+# ComfyUI-SAM-Body4D Requirements
+#
+# Core dependencies for the node suite.
+# SAM-Body4D itself should be installed separately (see install.py)
+
+# PyTorch (should be installed via ComfyUI)
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Core utilities
+numpy<2.0.0
+opencv-python>=4.8.0
+Pillow>=9.0.0
+
+# Configuration
+omegaconf>=2.3.0
+
+# 3D processing
+trimesh>=3.21.0
+scipy>=1.9.0
+
+# Model downloads
+huggingface_hub>=0.16.0
+
+# Note: SAM-Body4D should be installed separately:
+# cd /path/to/sam-body4d && pip install -e .

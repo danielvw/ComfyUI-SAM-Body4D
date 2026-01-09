@@ -1,0 +1,44 @@
+[project]
+name = "comfyui-sam-body4d"
+version = "1.0.0"
+description = "ComfyUI custom node suite for converting image sequences to animated FBX with SAM-Body4D"
+authors = [
+    {name = "ComfyUI-SAM-Body4D Contributors"}
+]
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+keywords = ["comfyui", "sam-body4d", "3d", "animation", "fbx", "skeleton", "rigging"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "numpy<2.0.0",
+    "opencv-python>=4.8.0",
+    "Pillow>=9.0.0",
+    "omegaconf>=2.3.0",
+    "trimesh>=3.21.0",
+    "scipy>=1.9.0",
+    "huggingface_hub>=0.16.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/YOUR_USERNAME/ComfyUI-SAM-Body4D"
+Repository = "https://github.com/YOUR_USERNAME/ComfyUI-SAM-Body4D"
+Issues = "https://github.com/YOUR_USERNAME/ComfyUI-SAM-Body4D/issues"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["nodes", "lib"]
