@@ -368,10 +368,14 @@ class Body4DProcess:
                 print(f"[Body4D] WARNING: Batch starting at frame {i} has no valid masks, skipping")
                 continue
 
+            print(f"[Body4D] DEBUG: bboxes_batch has {len(bboxes_batch)} frames, id_batch={id_batch}")
+            print(f"[Body4D] DEBUG: First bbox shape: {bboxes_batch[0].shape if bboxes_batch else 'NONE'}")
+
             # Run SAM-3D-Body inference
             # CRITICAL: Disable autocast to prevent BFloat16 tensors
             # PyTorch CUDA doesn't support "addmm_sparse_cuda" with BFloat16
             # The MHR TorchScript model has BFloat16 sparse constants that crash on CUDA
+            print(f"[Body4D] DEBUG: Calling estimator.process_frames...")
             with torch.cuda.amp.autocast(enabled=False):
                 outputs_batch = estimator.process_frames(
                     batch_frames,
@@ -386,10 +390,16 @@ class Body4DProcess:
                     occ_dict={obj_id: [1] * len(batch_frames) for obj_id in out_obj_ids},
                 )
 
+            print(f"[Body4D] DEBUG: outputs_batch type={type(outputs_batch)}, len={len(outputs_batch) if outputs_batch else 0}")
+            if outputs_batch:
+                print(f"[Body4D] DEBUG: First output type={type(outputs_batch[0])}")
+
             # Organize outputs by person
             for frame_outputs, ids in zip(outputs_batch, id_batch):
+                print(f"[Body4D] DEBUG: frame_outputs type={type(frame_outputs)}, ids={ids}")
                 for person_output, person_id in zip(frame_outputs, ids):
                     person_outputs[person_id].append(person_output)
+                    print(f"[Body4D] DEBUG: Added output for person {person_id}")
 
         # Debug: Check if we got any outputs
         for obj_id in out_obj_ids:
