@@ -195,6 +195,17 @@ class LoadBody4DModel:
                 fov_estimator=fov_estimator,
             )
 
+            # CRITICAL: Convert MHR model to Float32 to avoid BFloat16 sparse ops issue
+            # PyTorch CUDA doesn't support "addmm_sparse_cuda" with BFloat16
+            print("[Body4D] Converting MHR model to Float32 (BFloat16 sparse ops not supported)...")
+            if hasattr(estimator.model, 'head_pose') and hasattr(estimator.model.head_pose, 'mhr'):
+                try:
+                    # Convert MHR TorchScript model to Float32
+                    estimator.model.head_pose.mhr = estimator.model.head_pose.mhr.to(torch.float32)
+                    print("[Body4D] MHR model converted to Float32")
+                except Exception as e:
+                    print(f"[Body4D] Warning: Could not convert MHR to Float32: {e}")
+
             # 3. Optional: Diffusion-VAS for occlusion
             pipeline_mask = None
             pipeline_rgb = None
