@@ -25,7 +25,7 @@ Diese Node-Suite integriert SAM-Body4D in ComfyUI und ermöglicht:
 1. **Repository klonen:**
    ```bash
    cd ComfyUI/custom_nodes
-   git clone https://github.com/YOUR_USERNAME/ComfyUI-SAM-Body4D.git
+   git clone https://github.com/danielvw/ComfyUI-SAM-Body4D.git
    cd ComfyUI-SAM-Body4D
    ```
 
