@@ -1,7 +1,7 @@
 # ComfyUI-SAM-Body4D
 
 [![en](https://img.shields.io/badge/lang-en-blue.svg)](README.md)
-[![de](https://img.shields.io/badge/lang-de-yellow.svg)](README.de.md)
+[![de](https://img.shields.io/badge/lang-de-yellow.svg)](README_de.md)
 
 Custom Node Suite for ComfyUI to convert image sequences into animated FBX files with skeleton rigging.
 
