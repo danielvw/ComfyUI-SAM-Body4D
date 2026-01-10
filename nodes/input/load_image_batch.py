@@ -140,6 +140,9 @@ class LoadImageBatch:
         if not images:
             error_msg = f"No images could be loaded. Found {len(image_files)} files but all failed to load."
             if failed_images:
+                print(f"[Body4D] All {len(failed_images)} images failed to load:")
+                for img_path, error in failed_images[:5]:  # Show first 5 errors
+                    print(f"[Body4D]   {os.path.basename(img_path)}: {error}")
                 error_msg += f"\nFirst error: {failed_images[0][1]}"
             raise ValueError(error_msg)
 
