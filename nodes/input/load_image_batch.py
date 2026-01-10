@@ -60,7 +60,7 @@ class LoadImageBatch:
 
         Args:
             directory: Path to directory (relative to input folder or absolute)
-            pattern: Glob pattern for matching files
+            pattern: Glob pattern for matching files (supports #### for digit placeholders)
             start_index: Skip first N images
             max_frames: Limit number of frames (0 = no limit)
 
@@ -68,6 +68,7 @@ class LoadImageBatch:
             Tuple of (images tensor, frame_count)
         """
         import glob
+        import re
 
         # Resolve directory path
         if not os.path.isabs(directory):
@@ -78,9 +79,38 @@ class LoadImageBatch:
         if not os.path.exists(directory):
             raise ValueError(f"Directory not found: {directory}")
 
+        # Convert #### pattern to glob pattern
+        # e.g., "frame_####.png" -> "frame_*.png"
+        glob_pattern = re.sub(r'#+', '*', pattern)
+
         # Find all matching files
-        search_pattern = os.path.join(directory, pattern)
+        search_pattern = os.path.join(directory, glob_pattern)
         image_files = sorted(glob.glob(search_pattern))
+
+        print(f"[Body4D] Debug: directory={directory}")
+        print(f"[Body4D] Debug: pattern={pattern}")
+        print(f"[Body4D] Debug: glob_pattern={glob_pattern}")
+        print(f"[Body4D] Debug: search_pattern={search_pattern}")
+        print(f"[Body4D] Debug: found {len(image_files)} files with glob")
+
+        # If original pattern had ####, filter results with regex
+        if '#' in pattern:
+            # Convert pattern to regex: "frame_####.png" -> "frame_\d{4}\.png"
+            regex_pattern = pattern.replace('.', r'\.')
+            regex_pattern = re.sub(r'(#+)', lambda m: r'\d{' + str(len(m.group(1))) + '}', regex_pattern)
+            regex_pattern = '^' + regex_pattern + '$'
+
+            print(f"[Body4D] Debug: regex_pattern={regex_pattern}")
+
+            filtered_files = []
+            for f in image_files:
+                basename = os.path.basename(f)
+                matches = re.match(regex_pattern, basename)
+                print(f"[Body4D] Debug: {basename} -> {'MATCH' if matches else 'NO MATCH'}")
+                if matches:
+                    filtered_files.append(f)
+
+            image_files = filtered_files
 
         if not image_files:
             raise ValueError(f"No images found matching pattern: {search_pattern}")
@@ -97,10 +127,24 @@ class LoadImageBatch:
 
         # Load all images
         images = []
+        failed_images = []
         for img_path in image_files:
-            img = Image.open(img_path).convert('RGB')
-            img_np = np.array(img).astype(np.float32) / 255.0
-            images.append(img_np)
+            try:
+                img = Image.open(img_path).convert('RGB')
+                img_np = np.array(img).astype(np.float32) / 255.0
+                images.append(img_np)
+            except Exception as e:
+                failed_images.append((img_path, str(e)))
+                print(f"[Body4D] Warning: Failed to load {img_path}: {e}")
+
+        if not images:
+            error_msg = f"No images could be loaded. Found {len(image_files)} files but all failed to load."
+            if failed_images:
+                error_msg += f"\nFirst error: {failed_images[0][1]}"
+            raise ValueError(error_msg)
+
+        if failed_images:
+            print(f"[Body4D] Warning: {len(failed_images)} images failed to load")
 
         # Stack into batch tensor [B, H, W, C]
         images_tensor = torch.from_numpy(np.stack(images, axis=0))
