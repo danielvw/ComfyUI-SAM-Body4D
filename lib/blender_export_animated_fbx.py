@@ -2,7 +2,7 @@
 """
 Blender Script for Animated FBX Export
 
-This script creates a Blender armature from MHR70 skeleton data,
+This script creates a Blender armature from MHR70/MHR127 skeleton data,
 applies animation keyframes, and exports to FBX format.
 
 Usage:
@@ -16,7 +16,7 @@ import bpy
 from mathutils import Vector, Quaternion, Matrix
 
 
-# MHR70 Bone Hierarchy (same as skeleton_utils.py)
+# MHR70 Bone Hierarchy (fallback for backwards compatibility)
 MHR70_BONE_NAMES = [
     "nose", "left_eye", "right_eye", "left_ear", "right_ear",
     "left_shoulder", "right_shoulder", "left_elbow", "right_elbow",
@@ -89,10 +89,35 @@ def create_armature(skeleton_data):
     first_frame = skeleton_data['frames'][0]
     joint_positions = first_frame['joint_positions']
 
-    # Get joint indices (which MHR70 bones are included)
-    # If not specified, assume all 70 bones
+    # Get joint metadata
     joint_indices = skeleton_data.get('joint_indices', list(range(70)))
     joint_count = skeleton_data.get('joint_count', len(joint_positions))
+
+    # Get bone names and parents from JSON (for MHR127) or fallback to MHR70
+    if 'bone_names' in skeleton_data:
+        bone_names = skeleton_data['bone_names']
+        print(f"[Blender] Using bone names from JSON")
+    else:
+        # Fallback to MHR70 for backwards compatibility
+        bone_names = [MHR70_BONE_NAMES[idx] for idx in joint_indices]
+        print(f"[Blender] Using MHR70 bone names (fallback)")
+
+    if 'bone_parents' in skeleton_data:
+        # Local parent indices (already mapped to subset)
+        bone_parents_local = skeleton_data['bone_parents']
+        print(f"[Blender] Using bone parents from JSON")
+    else:
+        # Fallback to MHR70 hierarchy
+        bone_parents_local = []
+        for mhr70_idx in joint_indices:
+            parent_mhr70_idx = MHR70_BONE_PARENTS[mhr70_idx]
+            if parent_mhr70_idx == -1:
+                bone_parents_local.append(-1)
+            elif parent_mhr70_idx in joint_indices:
+                bone_parents_local.append(joint_indices.index(parent_mhr70_idx))
+            else:
+                bone_parents_local.append(-1)
+        print(f"[Blender] Using MHR70 bone parents (fallback)")
 
     print(f"[Blender] Joint subset: {skeleton_data.get('joint_subset', 'full_70')}")
     print(f"[Blender] Joint count: {joint_count}")
@@ -100,9 +125,9 @@ def create_armature(skeleton_data):
     # Create bones with hierarchy
     bones_created = {}
 
-    # First pass: create bones for the selected joints
-    for local_idx, mhr70_idx in enumerate(joint_indices):
-        bone_name = MHR70_BONE_NAMES[mhr70_idx]
+    # First pass: create bones
+    for local_idx in range(len(bone_names)):
+        bone_name = bone_names[local_idx]
 
         # Create bone
         bone = armature.data.edit_bones.new(bone_name)
@@ -122,14 +147,14 @@ def create_armature(skeleton_data):
 
         bones_created[bone_name] = bone
 
-    # Second pass: set parent relationships (only if both bones exist)
-    for local_idx, mhr70_idx in enumerate(joint_indices):
-        bone_name = MHR70_BONE_NAMES[mhr70_idx]
-        parent_mhr70_idx = MHR70_BONE_PARENTS[mhr70_idx]
+    # Second pass: set parent relationships
+    for local_idx in range(len(bone_names)):
+        bone_name = bone_names[local_idx]
+        parent_local_idx = bone_parents_local[local_idx]
 
-        if parent_mhr70_idx != -1:
-            parent_name = MHR70_BONE_NAMES[parent_mhr70_idx]
-            # Only connect if parent is also in our subset
+        if parent_local_idx != -1 and parent_local_idx < len(bone_names):
+            parent_name = bone_names[parent_local_idx]
+
             if parent_name in bones_created and bone_name in armature.data.edit_bones:
                 armature.data.edit_bones[bone_name].parent = armature.data.edit_bones[parent_name]
 

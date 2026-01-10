@@ -18,7 +18,7 @@ from constants import BLENDER_TIMEOUT
 
 # Import skeleton utils
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "lib"))
-from skeleton_utils import MHR70_BONE_NAMES
+from skeleton_utils import MHR70_BONE_NAMES, MHR127_BONE_NAMES, get_mhr127_parents
 
 
 class Body4DExportFBX:
@@ -257,20 +257,51 @@ class Body4DExportFBX:
             }
             frames.append(frame_data)
 
+        # Determine which bone definitions to use based on joint_indices
+        joint_indices = animation['joint_indices']
+        max_joint_idx = max(joint_indices) if joint_indices else 0
+
+        if max_joint_idx >= 70:
+            # Using MHR127 joints
+            bone_names = [MHR127_BONE_NAMES[i] for i in joint_indices]
+            bone_parents = get_mhr127_parents()
+        else:
+            # Using MHR70 joints (backwards compatible)
+            bone_names = [MHR70_BONE_NAMES[i] for i in joint_indices]
+            bone_parents = None  # Blender script will use hardcoded MHR70_BONE_PARENTS
+
         # Build complete skeleton data
         skeleton_data = {
             'frames': frames,
             'fps': animation['fps'],
-            'joint_count': len(animation['joint_indices']),
-            'joint_indices': animation['joint_indices'],  # Which MHR70 joints to use
-            'joint_subset': animation['joint_subset'],    # Name of subset (full_70, body_17, etc.)
+            'joint_count': len(joint_indices),
+            'joint_indices': joint_indices,
+            'joint_subset': animation['joint_subset'],
+            'bone_names': bone_names,  # Bone names for this subset
         }
+
+        # Add bone parent hierarchy if using MHR127
+        if bone_parents is not None:
+            # Map global parent indices to local subset indices
+            local_parents = []
+            for global_idx in joint_indices:
+                parent_global_idx = bone_parents[global_idx]
+                if parent_global_idx == -1:
+                    local_parents.append(-1)
+                elif parent_global_idx in joint_indices:
+                    # Parent is in the subset, use its local index
+                    local_parents.append(joint_indices.index(parent_global_idx))
+                else:
+                    # Parent is not in subset, mark as root
+                    local_parents.append(-1)
+            skeleton_data['bone_parents'] = local_parents
 
         # Save to JSON
         with open(output_path, 'w') as f:
             json.dump(skeleton_data, f, indent=2)
 
         print(f"[Body4D] Saved skeleton JSON: {output_path}")
+        print(f"  - Using {'MHR127' if max_joint_idx >= 70 else 'MHR70'} bone definitions")
 
     def _save_mesh_obj(self, animation, frame_idx, output_path):
         """Save reference mesh as OBJ file."""

@@ -1,8 +1,10 @@
 """
 Skeleton Utilities
 
-Defines MHR70 bone hierarchy and skeleton structure for Blender export.
+Defines MHR70 and MHR127 bone hierarchies and skeleton structure for Blender export.
 """
+
+import os
 
 # MHR70 Bone Hierarchy (70 joints)
 # Based on sam-body4d/models/sam_3d_body/sam_3d_body/metadata/mhr70.py
@@ -170,4 +172,123 @@ def get_bone_hierarchy():
             hierarchy[bone_name] = None
         else:
             hierarchy[bone_name] = MHR70_BONE_NAMES[parent_idx]
+    return hierarchy
+
+
+# MHR127 Full Skeleton (127 joints)
+# Joints 0-69: Same as MHR70
+# Joints 70-126: Additional joints (use generic names until extracted from MHR model)
+MHR127_BONE_NAMES = MHR70_BONE_NAMES + [f"joint_{i}" for i in range(70, 127)]
+
+# MHR127 Parent hierarchy placeholder
+# This will be populated at runtime from the MHR model
+# Format: {joint_idx: parent_idx}
+MHR127_BONE_PARENTS = None
+
+
+def extract_mhr127_hierarchy(mhr_model_path=None):
+    """
+    Extract the full 127-joint parent hierarchy from MHR model.
+
+    Args:
+        mhr_model_path: Path to mhr_model.pt file (optional, will search if not provided)
+
+    Returns:
+        dict: {joint_idx: parent_idx} for all 127 joints, or None if extraction fails
+    """
+    try:
+        import torch
+
+        # If no path provided, try to find it
+        if mhr_model_path is None or not os.path.exists(mhr_model_path):
+            import folder_paths
+            import glob
+
+            # Try ComfyUI models directory first
+            possible_paths = [
+                os.path.join(folder_paths.models_dir, "sam3dbody", "assets", "mhr_model.pt"),
+                os.path.expanduser("~/.cache/huggingface/hub/models--facebook--sam-3d-body-dinov3/snapshots/*/assets/mhr_model.pt"),
+            ]
+
+            for path in possible_paths:
+                if '*' in path:
+                    matches = glob.glob(path)
+                    if matches:
+                        matches.sort(key=os.path.getmtime, reverse=True)
+                        mhr_model_path = matches[0]
+                        break
+                elif os.path.exists(path):
+                    mhr_model_path = path
+                    break
+
+        if mhr_model_path is None or not os.path.exists(mhr_model_path):
+            print(f"[skeleton_utils] Warning: MHR model not found, cannot extract 127-joint hierarchy")
+            return None
+
+        print(f"[skeleton_utils] Loading MHR model from: {mhr_model_path}")
+        mhr = torch.jit.load(mhr_model_path, map_location='cpu')
+
+        # Extract joint_parents tensor
+        joint_parents = mhr.character_torch.skeleton.joint_parents
+
+        if len(joint_parents) != 127:
+            print(f"[skeleton_utils] Warning: Expected 127 joints, got {len(joint_parents)}")
+            return None
+
+        # Convert to dict format
+        parents_dict = {i: int(joint_parents[i]) for i in range(127)}
+        print(f"[skeleton_utils] Successfully extracted 127-joint hierarchy")
+
+        return parents_dict
+
+    except Exception as e:
+        print(f"[skeleton_utils] Error extracting MHR127 hierarchy: {e}")
+        return None
+
+
+def get_mhr127_parents(mhr_model_path=None):
+    """
+    Get MHR127 parent hierarchy, extracting from model if not already cached.
+
+    Args:
+        mhr_model_path: Optional path to MHR model
+
+    Returns:
+        dict: {joint_idx: parent_idx} or fallback to MHR70 hierarchy extended
+    """
+    global MHR127_BONE_PARENTS
+
+    # If already extracted, return cached version
+    if MHR127_BONE_PARENTS is not None:
+        return MHR127_BONE_PARENTS
+
+    # Try to extract from model
+    MHR127_BONE_PARENTS = extract_mhr127_hierarchy(mhr_model_path)
+
+    # Fallback: extend MHR70 hierarchy with generic assignments
+    if MHR127_BONE_PARENTS is None:
+        print("[skeleton_utils] Using fallback hierarchy for joints 70-126")
+        MHR127_BONE_PARENTS = MHR70_BONE_PARENTS.copy()
+        # Assign additional joints as children of root (neck at index 69)
+        for i in range(70, 127):
+            MHR127_BONE_PARENTS[i] = 69  # Parent to neck as fallback
+
+    return MHR127_BONE_PARENTS
+
+
+def get_bone_hierarchy_127():
+    """
+    Get MHR127 bone hierarchy as dict: bone_name -> parent_bone_name.
+
+    Returns:
+        dict: {bone_name: parent_bone_name or None}
+    """
+    parents = get_mhr127_parents()
+    hierarchy = {}
+    for idx, bone_name in enumerate(MHR127_BONE_NAMES):
+        parent_idx = parents[idx]
+        if parent_idx == -1:
+            hierarchy[bone_name] = None
+        else:
+            hierarchy[bone_name] = MHR127_BONE_NAMES[parent_idx]
     return hierarchy

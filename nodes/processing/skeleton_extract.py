@@ -35,9 +35,9 @@ class Body4DSkeletonExtract:
                     "min": 0,
                     "tooltip": "Person ID for multi-person sequences (0-indexed)"
                 }),
-                "joint_subset": (["full_70", "body_17", "body_hands"], {
+                "joint_subset": (["full_127", "full_70", "body_17", "body_hands"], {
                     "default": "full_70",
-                    "tooltip": "Subset of joints to extract"
+                    "tooltip": "Subset of joints to extract (full_127 = complete MHR skeleton with 127 joints)"
                 }),
                 "smooth_factor": ("FLOAT", {
                     "default": 0.0,
