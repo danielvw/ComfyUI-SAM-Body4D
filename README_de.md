@@ -2,7 +2,6 @@
 
 [![en](https://img.shields.io/badge/lang-en-blue.svg)](README.md)
 [![de](https://img.shields.io/badge/lang-de-yellow.svg)](README_de.md)
-
 ![Status](https://img.shields.io/badge/status-WIP-orange)
 
 > [!WARNING]
